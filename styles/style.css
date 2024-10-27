@@ -38,6 +38,7 @@ button {
   margin: 5px;
   padding-bottom: 7px;
   border: 3px solid black;
+  color: black;
   background: linear-gradient(to top, gray 7px, transparent 1px),
 
     linear-gradient(to top, white 10px, transparent 1px),
