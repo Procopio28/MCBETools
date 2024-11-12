@@ -69,3 +69,8 @@ button:active {
 
     linear-gradient(to right, white 3px, lightgray 1px);
 }
+footer {
+    position: fixed;
+    bottom: 0;
+    text-align: center;
+}
