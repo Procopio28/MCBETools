@@ -13,7 +13,7 @@ img {
 }
 
 body {
-  background-image: url(/images/Minecraft.jpg);
+  background-image: url(mcbetools/images/Minecraft.jpg);
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-size: cover;
