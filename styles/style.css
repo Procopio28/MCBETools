@@ -1,6 +1,6 @@
 @font-face {
   font-family: Minecraftia;
-  src: url(/styles/Minecraft.otf);
+  src: url(/MCBETools/styles/Minecraft.otf);
 }
 
 img {
@@ -13,7 +13,7 @@ img {
 }
 
 body {
-  background-image: url(/images/Minecraft.jpg);
+  background-image: url(/MCBETools/images/Minecraft.jpg);
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-size: cover;
