@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Hostile Mob-Dex</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #333;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        h1 {
+            text-align: center;
+            color: #52D017;
+            text-shadow: 2px 2px 4px #000;
+        }
+
+        .pokedex-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .mob-card {
+            background-color: #4a4a4a;
+            border: 2px solid #222;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .mob-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
+            border-color: #52D017;
+        }
+
+        .mob-card img {
+            max-width: 100px;
+            height: auto;
+            image-rendering: pixelated;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 5px;
+        }
+
+        .mob-card h2 {
+            margin: 10px 0 5px 0;
+            color: #fff;
+        }
+
+        .mob-card .description {
+            font-size: 0.9em;
+            color: #ccc;
+            height: 60px;
+            overflow: hidden;
+        }
+
+        .mob-card .stats {
+            margin-top: 10px;
+            font-size: 0.8em;
+            color: #ddd;
+            background-color: #3a3a3a;
+            padding: 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Minecraft Hostile Mob-Dex</h1>
+    
+    <div id="pokedex" class="pokedex-container"></div>
+
+    <script>
+        const hostileMobs = [
+            {
+                name: "Creeper",
+                imageUrl: "./images/creeper.png",
+                description: "A common, silent mob that ambushes players and explodes.",
+                stats: "Health: 20 | Attack: Varies (Explosion)"
+            },
+            {
+                name: "Zombie",
+                imageUrl: "./images/zombie.png",
+                description: "A slow-moving undead mob that attacks by melee.",
+                stats: "Health: 20 | Attack: 2.5-4.5"
+            },
+            {
+                name: "Skeleton",
+                imageUrl: "./images/skeleton.png",
+                description: "An undead mob that shoots arrows from a distance.",
+                stats: "Health: 20 | Attack: 1-5 (Bow)"
+            },
+            {
+                name: "Spider",
+                imageUrl: "./images/spider.png",
+                description: "A neutral mob in daylight, but hostile at night. Can climb walls.",
+                stats: "Health: 16 | Attack: 2-3"
+            },
+            {
+                name: "Enderman",
+                imageUrl: "./images/enderman.png",
+                description: "A neutral mob that becomes hostile when looked at. Can teleport.",
+                stats: "Health: 40 | Attack: 7"
+            },
+            {
+                name: "Witch",
+                imageUrl: "./images/witch.png",
+                description: "Uses splash potions to attack enemies and heal itself.",
+                stats: "Health: 26 | Attack: Potions"
+            },
+            {
+                name: "Ghast",
+                imageUrl: "./images/ghast.png",
+                description: "A large, flying mob in the Nether that shoots explosive fireballs.",
+                stats: "Health: 10 | Attack: Varies (Fireball)"
+            },
+            {
+                name: "Blaze",
+                imageUrl: "./images/blaze.png",
+                description: "A Nether mob that flies and shoots fireballs in volleys.",
+                stats: "Health: 20 | Attack: 5 (Melee), 3 (Fireball)"
+            },
+            {
+                name: "Wither Skeleton",
+                imageUrl: "./images/witherskeleton.png",
+                description: "A dangerous skeleton found in Nether Fortresses. Inflicts Wither effect.",
+                stats: "Health: 20 | Attack: 5-12"
+            },
+            {
+                name: "Phantom",
+                imageUrl: "./images/phantom.png",
+                description: "An undead flying mob that attacks players who haven't slept.",
+                stats: "Health: 20 | Attack: 4-9"
+            },
+            {
+                name: "Guardian",
+                imageUrl: "./images/guardian.png",
+                description: "A hostile mob found in ocean monuments that attacks with a laser beam.",
+                stats: "Health: 30 | Attack: 4-9 (Laser)"
+            },
+            {
+                name: "Shulker",
+                imageUrl: "./images/shulker.png",
+                description: "A mob found in End cities that shoots projectiles causing levitation.",
+                stats: "Health: 30 | Attack: 4 (Projectile)"
+            },
+            {
+                name: "Vindicator",
+                imageUrl: "./images/vindicator.png",
+                description: "An illager armed with an iron axe, found in woodland mansions.",
+                stats: "Health: 24 | Attack: 7-19"
+            },
+            {
+                name: "Evoker",
+                imageUrl: "./images/evoker.png",
+                description: "A spell-casting illager that summons vexes and fangs.",
+                stats: "Health: 24 | Attack: 6 (Fangs)"
+            },
+            {
+                name: "Pillager",
+                imageUrl: "./images/pillager.png",
+                description: "An illager armed with a crossbow, found in patrols and outposts.",
+                stats: "Health: 24 | Attack: 4 (Crossbow)"
+            },
+            {
+                name: "Ravager",
+                imageUrl: "./images/ravager.png",
+                description: "A large, powerful mob that appears in raids. Can destroy crops.",
+                stats: "Health: 100 | Attack: 7-18"
+            },
+            {
+                name: "Hoglin",
+                imageUrl: "./images/hoglin.png",
+                description: "A brutish beast found in the Nether. Hunted by piglins.",
+                stats: "Health: 40 | Attack: 3-6"
+            },
+            {
+                name: "Zoglin",
+                imageUrl: "./images/zoglin.png",
+                description: "A zombified hoglin, created when a hoglin enters the Overworld.",
+                stats: "Health: 40 | Attack: 3-6"
+            },
+            {
+                name: "Piglin Brute",
+                imageUrl: "./images/piglinbrute.png",
+                description: "A stronger piglin that guards bastion remnants and always attacks.",
+                stats: "Health: 50 | Attack: 7-20"
+            },
+            {
+                name: "Warden",
+                imageUrl: "./images/warden.png",
+                description: "A powerful blind mob found in the Deep Dark, hunting by sound.",
+                stats: "Health: 500 | Attack: 16-45"
+            }
+        ];
+
+        function renderPokedex() {
+            const pokedexContainer = document.getElementById('pokedex');
+
+            hostileMobs.forEach(mob => {
+                const linkWrapper = document.createElement('a');
+                const fileName = mob.name.toLowerCase().replace(/ /g, '') + '.html';
+                linkWrapper.href = fileName;
+                
+                const card = document.createElement('div');
+                card.className = 'mob-card';
+
+                card.innerHTML = `
+                    <img src="${mob.imageUrl}" alt="${mob.name}" loading="lazy">
+                    <h2>${mob.name}</h2>
+                    <p class="description">${mob.description}</p>
+                    <p class="stats">${mob.stats}</p>
+                `;
+
+                linkWrapper.appendChild(card);
+                pokedexContainer.appendChild(linkWrapper);
+            });
+        }
+
+        renderPokedex();
+    </script>
+</body>
+</html>
