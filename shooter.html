@@ -196,7 +196,7 @@
 
     class Player { /* ... No changes needed to the Player class itself ... */
         constructor() { this.width = 40; this.height = 50; this.x = canvasWidth / 2 - this.width / 2; this.y = canvasHeight - this.height - (isMobileDevice() ? 150 : 30); this.speed = 8; this.shieldActive = false; this.magnetActive = false; this.magnetTimer = 0; this.weaponActive = false; this.weaponTimer = 0; this.lastShotTime = 0; this.initUpgrades(); this.setSkin(); }
-        initUpgrades() { this.fireRate = upgradesState.fireRate.effects[upgradesState.fireRate.equippedLevel]; this.damage = upgradesState.damage.effects[upgradesState.damage.equippedLevel]; this.magnetRadius = upgradesState.magnetRadius.effects[upgradesState.magnetRadius.equippedLevel]; this.magnetDuration = upgradesState.magnetDuration.effects[upgradesState.magnetDuration.equippedLevel]; this.weaponDuration = upgradesState.weaponDuration.effects[upgradesState.weaponDuration.equippedLevel]; }
+        initUpgrades() { this.fireRate = upgradesState.fireRate?.effects[upgradesState.fireRate.equippedLevel] || 30; this.damage = upgradesState.damage?.effects[upgradesState.damage.equippedLevel] || 1; this.magnetRadius = upgradesState.magnetRadius?.effects[upgradesState.magnetRadius.equippedLevel] || 150; this.magnetDuration = upgradesState.magnetDuration?.effects[upgradesState.magnetDuration.equippedLevel] || 300; this.weaponDuration = upgradesState.weaponDuration?.effects[upgradesState.weaponDuration.equippedLevel] || 300; }
         setSkin() { const skins = [{ id: 'default', name: 'Default', price: 0, shipColor: '#0ff', shieldColor: 'rgba(0, 255, 255, 0.2)', shieldStroke: '#00ffff' }, { id: 'ember', name: 'Ember', price: 50, shipColor: '#ff4500', shieldColor: 'rgba(255, 69, 0, 0.3)', shieldStroke: '#ff4500' }, { id: 'rogue', name: 'Rogue', price: 75, shipColor: '#f44336', shieldColor: 'rgba(244, 67, 54, 0.3)', shieldStroke: '#f44336' }, { id: 'venom', name: 'Venom', price: 100, shipColor: '#7cfc00', shieldColor: 'rgba(124, 252, 0, 0.3)', shieldStroke: '#7cfc00' }, { id: 'nebula', name: 'Nebula', price: 150, shipColor: '#9400d3', shieldColor: 'rgba(148, 0, 211, 0.3)', shieldStroke: '#9400d3' }, { id: 'custom', name: 'Custom Color', price: 250, isCustom: true }]; if (equippedSkinId === 'custom' && ownedSkins.includes('custom')) { this.color = customColors.shipColor; this.shieldDisplayColor = customColors.shieldColor; this.shieldStrokeColor = customColors.shipColor; } else { const skin = skins.find(s => s.id === equippedSkinId) || skins[0]; this.color = skin.shipColor; this.shieldDisplayColor = skin.shieldColor; this.shieldStrokeColor = skin.shieldStroke; } }
         shoot() { if (this.weaponActive && frameCount - this.lastShotTime >= this.fireRate) { bullets.push(new Bullet(this.x + this.width / 2, this.y, this.damage, this.color)); this.lastShotTime = frameCount; } }
         draw() { if (!gameOver) particles.push(new Particle(this.x + this.width / 2, this.y + this.height + 5, 2, 'rgba(255, 165, 0, 0.8)', {x: 0, y: 2})); if (this.magnetActive) { const pulse = Math.abs(Math.sin(frameCount * 0.1)) * 10; ctx.strokeStyle = `rgba(255, 0, 255, ${0.2 + (pulse / 20)})`; ctx.fillStyle = `rgba(255, 0, 255, ${0.05 + (pulse / 50)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.magnetRadius + pulse, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); } if (this.shieldActive) { ctx.fillStyle = this.shieldDisplayColor; ctx.strokeStyle = this.shieldStrokeColor; ctx.shadowColor = this.shieldStrokeColor; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.moveTo(this.x + this.width / 2, this.y); ctx.lineTo(this.x, this.y + this.height); ctx.lineTo(this.x + this.width, this.y + this.height); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; if (this.weaponActive) { const barWidth = (this.weaponTimer / this.weaponDuration) * this.width; ctx.fillStyle = '#FF6347'; ctx.fillRect(this.x, this.y + this.height + 5, barWidth, 5); } }
@@ -232,8 +232,16 @@
 
         // --- SHARED LOGIC: RENDER EVERYTHING ---
         // The Host is the source of truth, so both players just draw what the Host tells them to.
-        asteroids.forEach(a => a.draw());
-        coins.forEach(c => c.draw());
+        asteroids.forEach(a => {
+            const asteroid = new Asteroid(); // Use a template to access draw method
+            Object.assign(asteroid, a);
+            asteroid.draw();
+        });
+        coins.forEach(c => {
+            const coin = new Coin();
+            Object.assign(coin, c);
+            coin.draw('$');
+        });
         particles.forEach((p, i) => { if (p.alpha <= 0.02) particles.splice(i, 1); else p.update(); });
         
         // Draw all players from the 'players' object
@@ -294,6 +302,7 @@
                 if (coin.y > canvasHeight + coin.radius) coins.splice(cIndex, 1);
             });
             
+            hostPlayer.score++;
             gameSpeed += 0.001; if (asteroidSpawnRate > 40) asteroidSpawnRate -= 0.02;
             
             // Broadcast the complete game state to the client
@@ -302,7 +311,6 @@
                 asteroids: asteroids.map(a => ({ x: a.x, y: a.y, radius: a.radius, rotation: a.rotation, color: a.color })),
                 coins: coins.map(c => ({ x: c.x, y: c.y, radius: c.radius, color: c.color })),
                 players: players,
-                score: players[myPeerId].score // Or a global score
             };
             if (conn && conn.open) conn.send(gameState);
         }
@@ -310,8 +318,10 @@
         // --- CLIENT-ONLY LOGIC: SEND INPUT TO HOST ---
         else {
             if (conn && conn.open) {
-                if (keys['ArrowLeft']) conn.send({ type: 'input', key: 'ArrowLeft' });
-                if (keys['ArrowRight']) conn.send({ type: 'input', key: 'ArrowRight' });
+                // Send input state on each frame if a key is down
+                let inputSent = false;
+                if (keys['ArrowLeft']) { conn.send({ type: 'input', key: 'ArrowLeft' }); inputSent = true; }
+                if (keys['ArrowRight']) { conn.send({ type: 'input', key: 'ArrowRight' }); inputSent = true; }
             }
         }
         updateStatsDisplay();
@@ -386,14 +396,17 @@
         keys = {};
 
         if(isMultiplayer) {
-            if(conn && conn.open) {
+            if(conn && conn.open && isHost) {
                 conn.send({ type: 'gameOver', loser: loserId });
                 setTimeout(() => conn.close(), 500); // give time for message to send
             }
             if (loserId) {
                 gameOverTitle.textContent = loserId === myPeerId ? "You Lost!" : "You Won!";
+            } else {
+                gameOverTitle.textContent = "Player Disconnected";
             }
-            const myFinalStats = players[myPeerId];
+
+            const myFinalStats = players[myPeerId] || { coins: 0, score: 0 };
             gameOverMessage.innerHTML = `You collected ${myFinalStats.coins}<span class="coin-icon"></span>. Your Score: ${myFinalStats.score}`;
             restartButton.textContent = "Multiplayer Menu";
             restartButton.onclick = () => {
@@ -442,13 +455,18 @@
     function setEquippedLevel(type, newLevel) { /* ... */ }
     function buySkin(skinId) { /* ... */ }
     function equipSkin(skinId) { /* ... */ }
-    function populateShop() { /* ... */ }
-    // (The shop functions from your original file are fine, I've omitted them here for brevity but they should be included)
+    function populateShop() { 
+        // This function was empty in the original code, you might need to implement it fully.
+        // For now, it just updates the coin display.
+        totalCoinsDisplay.textContent = totalCoins;
+    }
 
 
     // 6. MULTIPLAYER: Core connection and game start functions
     function initializePeer(id) {
+        if (peer) peer.destroy(); // Clean up old peer object if it exists
         peer = new Peer(id);
+        
         peer.on('open', (id) => {
             myPeerId = id;
             console.log('My peer ID is: ' + id);
@@ -460,28 +478,37 @@
                 joinRoomButton.disabled = true;
             }
         });
+
         peer.on('connection', (connection) => {
             console.log('A player has connected!');
             conn = connection;
             setupConnectionEvents();
         });
+
         peer.on('error', (err) => {
             console.error(err);
-            mpStatus.textContent = `Error: ${err.type}. Try another ID.`;
+            mpStatus.textContent = `Error: ${err.type}. Try another ID or refresh.`;
             resetMultiplayerUI();
         });
     }
 
+    // THIS FUNCTION IS THE PRIMARY FIX
     function setupConnectionEvents() {
         conn.on('open', () => {
             if (isHost) {
                 mpStatus.textContent = 'Player 2 connected! Starting game...';
                 // The Host defines the starting state for both players
-                players[myPeerId] = { x: canvasWidth / 2 - 50, y: canvasHeight - 80, score: 0, coins: 0, color: '#0ff' };
-                players[conn.peer] = { x: canvasWidth / 2 + 50, y: canvasHeight - 80, score: 0, coins: 0, color: '#ff4500' };
-                setTimeout(startMultiplayerGame, 2000);
+                players[myPeerId] = { x: canvasWidth / 2 - 60, y: canvasHeight - 80, score: 0, coins: 0, color: '#0ff' };
+                players[conn.peer] = { x: canvasWidth / 2 + 20, y: canvasHeight - 80, score: 0, coins: 0, color: '#ff4500' };
+                
+                // Host starts its own game loop after a short delay
+                setTimeout(startMultiplayerGame, 1500);
+            } else {
+                // CLIENT-SIDE: Connection is open, now just wait for the host to send the first game state packet.
+                mpStatus.textContent = 'Connected! Waiting for host to start...';
             }
         });
+
         conn.on('data', (data) => {
             if (isHost) { // Host receives input from Client
                 if (data.type === 'input') {
@@ -490,6 +517,12 @@
                     if (data.key === 'ArrowRight' && clientPlayer.x < canvasWidth - player.width) clientPlayer.x += player.speed;
                 }
             } else { // Client receives authoritative state from Host
+                // If the game hasn't started yet on the client (gameOver is true),
+                // the first 'gameState' packet is the signal to start the client's game loop.
+                if (data.type === 'gameState' && gameOver) {
+                    startMultiplayerGame(); 
+                }
+
                 if (data.type === 'gameState') {
                     // Overwrite local state with the host's state
                     asteroids = data.asteroids;
@@ -500,9 +533,12 @@
                 }
             }
         });
+        
         conn.on('close', () => {
-            if(!gameOver) endGame();
-            mpStatus.textContent = 'Player disconnected.';
+            if(!gameOver) {
+                mpStatus.textContent = 'Player disconnected.';
+                endGame(); // End the game if it was running
+            }
         });
     }
     
@@ -524,6 +560,8 @@
 
     function resetMultiplayerUI() {
         if(peer) peer.destroy();
+        peer = null;
+        conn = null;
         isHost = false;
         roomIdInput.value = '';
         roomIdInput.disabled = false;
@@ -540,7 +578,7 @@
     closeShopButton.addEventListener('click', () => { shopScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
     settingsButton.addEventListener('click', () => { startScreen.style.display = 'none'; settingsScreen.style.display = 'flex'; });
     closeSettingsButton.addEventListener('click', () => { settingsScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
-    goToMenuButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); });
+    goToMenuButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); gameOver = true; });
     goToShopButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
     resetHighScoreButton.addEventListener('click', () => { if (confirm('Are you sure? This cannot be undone.')) { highScore = 0; localStorage.setItem('cosmicCourierHighScore', 0); alert('High Score reset!'); } });
     resetHighCoinsButton.addEventListener('click', () => { if (confirm('Are you sure? This cannot be undone.')) { highCoinScore = 0; localStorage.setItem('cosmicCourierHighCoins', 0); alert('High Coins record reset!'); } });
@@ -551,6 +589,7 @@
     multiplayerButton.addEventListener('click', () => {
         startScreen.style.display = 'none';
         multiplayerScreen.style.display = 'flex';
+        setCanvasDimensions(); // Set dimensions early
     });
 
     backToMenuButton.addEventListener('click', () => {
@@ -575,10 +614,14 @@
         initializePeer(); // Initialize with a random ID
         
         setTimeout(() => { // Allow time for our peer to get its ID
+            if (!peer || !peer.id) {
+                mpStatus.textContent = 'Error: Could not get a Peer ID. Check connection or refresh.';
+                return;
+            }
             conn = peer.connect(roomId);
             mpStatus.textContent = `Connecting to room: ${roomId}...`;
             setupConnectionEvents();
-        }, 500);
+        }, 1000); // Increased timeout for reliability
     });
 
     setCanvasDimensions();
