@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <!-- 1. MULTIPLAYER: Include the PeerJS library -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <title>Cosmic Courier</title>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
+        canvas { display: block; }
+        .ui-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
+        .menu { background-color: rgba(0, 0, 0, 0.8); padding: 30px; border-radius: 10px; pointer-events: all; border: 2px solid #0ff; box-shadow: 0 0 25px #0ff; min-width: 340px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+        h1 { font-size: 3em; margin: 0 0 10px 0; color: #0ff; text-shadow: 0 0 10px #0ff; }
+        h2 { font-size: 1.5em; margin: 20px 0 10px 0; color: #0ff; text-shadow: 0 0 5px #0ff; border-bottom: 1px solid rgba(0,255,255,0.4); padding-bottom: 5px; }
+        p { font-size: 1.2em; margin: 5px 0; }
+        .stats-container { z-index: 10; position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; display: flex; justify-content: space-between; padding: 20px; font-size: 1.2em; text-shadow: 0 0 5px #fff; pointer-events: none; }
+        .stats-left, .stats-right { display: flex; flex-direction: column; }
+        .stats-left { text-align: left; }
+        .stats-right { text-align: right; }
+        .button { padding: 10px 20px; font-size: 1.2em; background-color: #0ff; color: #000; border: none; cursor: pointer; border-radius: 5px; margin: 10px 0; font-family: 'Courier New', Courier, monospace; font-weight: bold; width: 220px; }
+        .button-secondary { background-color: transparent; border: 1px solid #0ff; color: #0ff; }
+        .button:hover { box-shadow: 0 0 15px #0ff; }
+        .button:disabled { background-color: #555; color: #999; border-color: #555; cursor: not-allowed; box-shadow: none; }
+        #mobile-controls { display: none; position: absolute; bottom: 0; left: 0; width: 100%; height: 120px; z-index: 100; padding: 20px; box-sizing: border-box; justify-content: space-between; align-items: center; }
+        .control-button { width: 45%; height: 100%; background-color: rgba(0, 255, 255, 0.2); border: 2px solid #0ff; color: #0ff; font-size: 2.5em; font-weight: bold; font-family: 'Courier New', Courier, monospace; border-radius: 10px; opacity: 0.7; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+        .control-button:active { background-color: rgba(0, 255, 255, 0.5); opacity: 1; }
+        .coin-icon { display: inline-block; width: 1em; height: 1em; background: #FFD700; border-radius: 50%; vertical-align: -0.15em; margin-right: 8px; box-shadow: 0 0 5px #FFD700; }
+        .shop-section { margin-bottom: 20px; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 5px; background-color: rgba(0, 255, 255, 0.05); border-radius: 5px; text-align: left;}
+        .shop-details { display: flex; align-items: center; flex-grow: 1; }
+        .shop-preview { width: 30px; height: 30px; border: 2px solid #fff; margin-right: 15px; border-radius: 5px; flex-shrink: 0; }
+        .shop-info { display: flex; flex-direction: column; flex-grow: 1; }
+        .shop-name { font-weight: bold; }
+        .shop-desc, .shop-price { font-size: 0.9em; opacity: 0.8; }
+        .shop-price .coin-icon { width: 0.8em; height: 0.8em; }
+        .shop-actions .button { width: 100px; padding: 5px 10px; font-size: 0.9em; margin: 0; }
+        .custom-color-picker { background: transparent; border: 1px solid #0ff; width: 30px; height: 30px; padding: 0; cursor: pointer; vertical-align: middle; margin-left: 10px;}
+        #total-coins-display .coin-icon, #total-coins-stat .coin-icon { width: 0.8em; height: 0.8em; vertical-align: baseline; margin-left: 5px; }
+        .gameover-buttons .button { width: 220px; margin: 5px 0; }
+        .shop-name-wrapper { display: flex; justify-content: space-between; align-items: center; }
+        .level-controls { display: flex; align-items: center; }
+        .level-arrow { cursor: pointer; font-size: 1.4em; padding: 0 8px; user-select: none; color: #0ff; font-weight: bold; }
+        .level-arrow.disabled { color: #555; cursor: not-allowed; }
+        .level-text { font-size: 0.9em; min-width: 80px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="stats-container" id="gameStatsContainer" style="display: none;">
+        <div class="stats-left">
+            <span id="coin-score"><span class="coin-icon"></span>0</span>
+            <span id="total-coins-stat">Total Coins: 0</span>
+        </div>
+        <div class="stats-right">
+            <span id="score">Score: 0</span>
+            <span id="high-score">High Score: 0</span>
+        </div>
+    </div>
+
+    <div id="startScreen" class="ui-panel">
+        <div class="menu">
+            <h1>Cosmic Courier</h1>
+            <p>Dodge asteroids, collect coins!</p>
+            <button class="button" id="startButton">Start Game</button>
+            <!-- 2. MULTIPLAYER: Add Multiplayer Button -->
+            <button class="button" id="multiplayerButton">Multiplayer</button>
+            <button class="button button-secondary" id="shopButton">Shop</button>
+            <button class="button button-secondary" id="settingsButton">Settings</button>
+        </div>
+    </div>
+
+    <!-- 3. MULTIPLAYER: Add Multiplayer Lobby Screen -->
+    <div id="multiplayerScreen" class="ui-panel" style="display: none;">
+        <div class="menu">
+            <h1>Multiplayer</h1>
+            <p id="mp-status">Create a room or join a friend's.</p>
+            <input type="text" id="room-id-input" placeholder="Enter Room ID" style="padding: 10px; font-size: 1.1em; width: 220px; text-align: center; background: #000; border: 1px solid #0ff; color: #fff; margin-bottom: 10px;">
+            <button class="button" id="createRoomButton">Create Room</button>
+            <button class="button" id="joinRoomButton">Join Room</button>
+            <button class="button button-secondary" id="backToMenuButton">Back to Main Menu</button>
+        </div>
+    </div>
+
+    <div id="settingsScreen" class="ui-panel" style="display: none;">
+        <div class="menu">
+            <h1>Settings</h1>
+            <p>Manage your saved data.</p>
+            <button class="button" id="resetHighScore">Reset High Score</button>
+            <button class="button" id="resetHighCoins">Reset High Coins Record</button>
+            <button class="button button-secondary" id="closeSettingsButton">Back to Menu</button>
+        </div>
+    </div>
+
+    <div id="shopScreen" class="ui-panel" style="display: none;">
+        <div class="menu">
+            <h1>Shop</h1>
+            <p id="total-coins-display">Total Coins: <span>0</span><span class="coin-icon"></span></p>
+            <div id="upgrades-section" class="shop-section"><h2>Ship Upgrades</h2><div id="upgrades-container"></div></div>
+            <div id="skins-section" class="shop-section"><h2>Ship Skins</h2><div id="skins-container"></div></div>
+            <button class="button" id="closeShopButton">Back to Menu</button>
+        </div>
+    </div>
+    
+    <div id="gameOverScreen" class="ui-panel" style="display: none;">
+        <div class="menu">
+            <h1 id="gameOverTitle">Game Over</h1>
+            <p id="gameOverMessage">You collected <span id="run-coins">0</span><span class="coin-icon"></span> this run.</p>
+            <div class="gameover-buttons">
+                <button class="button" id="restartButton">Try Again (Single Player)</button>
+                <button class="button button-secondary" id="goToShopButton">Go to Shop</button>
+                <button class="button button-secondary" id="goToMenuButton">Main Menu</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="mobile-controls">
+        <button id="left-btn" class="control-button"><</button>
+        <button id="right-btn" class="control-button">></button>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    // --- UI Elements ---
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const gameOverTitle = document.getElementById('gameOverTitle');
+    const gameOverMessage = document.getElementById('gameOverMessage');
+    const shopScreen = document.getElementById('shopScreen');
+    const settingsScreen = document.getElementById('settingsScreen');
+    const startButton = document.getElementById('startButton');
+    const restartButton = document.getElementById('restartButton');
+    const shopButton = document.getElementById('shopButton');
+    const settingsButton = document.getElementById('settingsButton');
+    const closeShopButton = document.getElementById('closeShopButton');
+    const closeSettingsButton = document.getElementById('closeSettingsButton');
+    const goToShopButton = document.getElementById('goToShopButton');
+    const goToMenuButton = document.getElementById('goToMenuButton');
+    const resetHighScoreButton = document.getElementById('resetHighScore');
+    const resetHighCoinsButton = document.getElementById('resetHighCoins');
+    const gameStatsContainer = document.getElementById('gameStatsContainer');
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('high-score');
+    const coinScoreEl = document.getElementById('coin-score');
+    const totalCoinsStatEl = document.getElementById('total-coins-stat');
+    const runCoinsEl = document.getElementById('run-coins');
+    const mobileControls = document.getElementById('mobile-controls');
+    const leftBtn = document.getElementById('left-btn');
+    const rightBtn = document.getElementById('right-btn');
+    const skinsContainer = document.getElementById('skins-container');
+    const upgradesContainer = document.getElementById('upgrades-container');
+    const totalCoinsDisplay = document.querySelector('#total-coins-display span');
+
+    // 4. MULTIPLAYER: UI and State Variables
+    const multiplayerButton = document.getElementById('multiplayerButton');
+    const multiplayerScreen = document.getElementById('multiplayerScreen');
+    const createRoomButton = document.getElementById('createRoomButton');
+    const joinRoomButton = document.getElementById('joinRoomButton');
+    const backToMenuButton = document.getElementById('backToMenuButton');
+    const roomIdInput = document.getElementById('room-id-input');
+    const mpStatus = document.getElementById('mp-status');
+    let peer, conn, myPeerId;
+    let isHost = false;
+    let isMultiplayer = false;
+    let players = {}; // Stores all player data, keyed by peerId
+
+    // --- Game State Variables ---
+    let canvasWidth, canvasHeight, player, stars, asteroids, particles, coins, powerUps, bullets, keys = {}, score = 0, coinsCollected = 0;
+    let gameOver = true, gameSpeed, asteroidSpawnRate, frameCount = 0;
+    
+    // --- Saved Data ---
+    let highScore = localStorage.getItem('cosmicCourierHighScore') || 0;
+    let highCoinScore = localStorage.getItem('cosmicCourierHighCoins') || 0;
+    let totalCoins = parseInt(localStorage.getItem('cosmicCourierTotalCoins') || '0');
+    let ownedSkins = JSON.parse(localStorage.getItem('cosmicCourierOwnedSkins') || '["default"]');
+    let equippedSkinId = localStorage.getItem('cosmicCourierEquippedSkin') || 'default';
+    let customColors = JSON.parse(localStorage.getItem('cosmicCourierCustomColors') || '{"shipColor": "#ffffff", "shieldColor": "rgba(255, 255, 255, 0.3)"}');
+    
+    // --- Centralized Upgrade State & Data ---
+    const upgradesState = { /* ... No changes needed here ... */ };
+    Object.keys(upgradesState).forEach(type => {
+        const state = upgradesState[type];
+        state.maxLevel = parseInt(localStorage.getItem(`cc_max_level_${type}`) || '0');
+        state.equippedLevel = parseInt(localStorage.getItem(`cc_equipped_level_${type}`) || state.maxLevel);
+        if (state.equippedLevel > state.maxLevel) {
+            state.equippedLevel = state.maxLevel;
+            localStorage.setItem(`cc_equipped_level_${type}`, state.equippedLevel);
+        }
+    });
+    
+    function isMobileDevice() { return ('ontouchstart' in window); }
+    function setCanvasDimensions() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; canvasWidth = canvas.width; canvasHeight = canvas.height; }
+
+    class Player { /* ... No changes needed to the Player class itself ... */
+        constructor() { this.width = 40; this.height = 50; this.x = canvasWidth / 2 - this.width / 2; this.y = canvasHeight - this.height - (isMobileDevice() ? 150 : 30); this.speed = 8; this.shieldActive = false; this.magnetActive = false; this.magnetTimer = 0; this.weaponActive = false; this.weaponTimer = 0; this.lastShotTime = 0; this.initUpgrades(); this.setSkin(); }
+        initUpgrades() { this.fireRate = upgradesState.fireRate.effects[upgradesState.fireRate.equippedLevel]; this.damage = upgradesState.damage.effects[upgradesState.damage.equippedLevel]; this.magnetRadius = upgradesState.magnetRadius.effects[upgradesState.magnetRadius.equippedLevel]; this.magnetDuration = upgradesState.magnetDuration.effects[upgradesState.magnetDuration.equippedLevel]; this.weaponDuration = upgradesState.weaponDuration.effects[upgradesState.weaponDuration.equippedLevel]; }
+        setSkin() { const skins = [{ id: 'default', name: 'Default', price: 0, shipColor: '#0ff', shieldColor: 'rgba(0, 255, 255, 0.2)', shieldStroke: '#00ffff' }, { id: 'ember', name: 'Ember', price: 50, shipColor: '#ff4500', shieldColor: 'rgba(255, 69, 0, 0.3)', shieldStroke: '#ff4500' }, { id: 'rogue', name: 'Rogue', price: 75, shipColor: '#f44336', shieldColor: 'rgba(244, 67, 54, 0.3)', shieldStroke: '#f44336' }, { id: 'venom', name: 'Venom', price: 100, shipColor: '#7cfc00', shieldColor: 'rgba(124, 252, 0, 0.3)', shieldStroke: '#7cfc00' }, { id: 'nebula', name: 'Nebula', price: 150, shipColor: '#9400d3', shieldColor: 'rgba(148, 0, 211, 0.3)', shieldStroke: '#9400d3' }, { id: 'custom', name: 'Custom Color', price: 250, isCustom: true }]; if (equippedSkinId === 'custom' && ownedSkins.includes('custom')) { this.color = customColors.shipColor; this.shieldDisplayColor = customColors.shieldColor; this.shieldStrokeColor = customColors.shipColor; } else { const skin = skins.find(s => s.id === equippedSkinId) || skins[0]; this.color = skin.shipColor; this.shieldDisplayColor = skin.shieldColor; this.shieldStrokeColor = skin.shieldStroke; } }
+        shoot() { if (this.weaponActive && frameCount - this.lastShotTime >= this.fireRate) { bullets.push(new Bullet(this.x + this.width / 2, this.y, this.damage, this.color)); this.lastShotTime = frameCount; } }
+        draw() { if (!gameOver) particles.push(new Particle(this.x + this.width / 2, this.y + this.height + 5, 2, 'rgba(255, 165, 0, 0.8)', {x: 0, y: 2})); if (this.magnetActive) { const pulse = Math.abs(Math.sin(frameCount * 0.1)) * 10; ctx.strokeStyle = `rgba(255, 0, 255, ${0.2 + (pulse / 20)})`; ctx.fillStyle = `rgba(255, 0, 255, ${0.05 + (pulse / 50)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.magnetRadius + pulse, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); } if (this.shieldActive) { ctx.fillStyle = this.shieldDisplayColor; ctx.strokeStyle = this.shieldStrokeColor; ctx.shadowColor = this.shieldStrokeColor; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.moveTo(this.x + this.width / 2, this.y); ctx.lineTo(this.x, this.y + this.height); ctx.lineTo(this.x + this.width, this.y + this.height); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; if (this.weaponActive) { const barWidth = (this.weaponTimer / this.weaponDuration) * this.width; ctx.fillStyle = '#FF6347'; ctx.fillRect(this.x, this.y + this.height + 5, barWidth, 5); } }
+        update() { if (keys['ArrowLeft'] && this.x > 0) this.x -= this.speed; if (keys['ArrowRight'] && this.x < canvasWidth - this.width) this.x += this.speed; this.shoot(); this.draw(); }
+    }
+    class Bullet { constructor(x, y, damage, color) { this.x = x - 2.5; this.y = y; this.width = 5; this.height = 15; this.speed = 10; this.damage = damage; this.color = color; } update() { this.y -= this.speed; } draw() { ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 10; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; } }
+    class Asteroid { constructor() { this.radius = Math.random() * 20 + 15; this.x = Math.random() * (canvasWidth - this.radius * 2) + this.radius; this.y = -this.radius; this.speed = Math.random() * 1 + gameSpeed; this.color = '#c5c5c5'; this.rotation = Math.random() * Math.PI * 2; this.rotationSpeed = (Math.random() - 0.5) * 0.04; this.health = Math.max(1, Math.floor(this.radius / 8)); } takeDamage(amount) { this.health -= amount; } draw() { ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation); ctx.fillStyle = this.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.shadowColor = this.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.moveTo(0 - this.radius, 0); for (let i = 1; i < 8; i++) { const angle = (i / 8) * Math.PI * 2; const dist = this.radius * (Math.random() * 0.4 + 0.8); ctx.lineTo(Math.cos(angle) * dist, Math.sin(angle) * dist); } ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); ctx.shadowBlur = 0; } update() { this.y += this.speed; this.rotation += this.rotationSpeed; this.draw(); } }
+    class Star { constructor() { this.x = Math.random() * canvasWidth; this.y = Math.random() * canvasHeight; this.radius = Math.random() * 1.5; this.speed = Math.random() * 0.5 + 0.2; this.color = 'rgba(255, 255, 255, 0.8)';} draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();} update() { this.y += this.speed * gameSpeed / 2; if (this.y > canvasHeight) { this.y = 0; this.x = Math.random() * canvasWidth;} this.draw();} }
+    class Particle { constructor(x, y, radius, color, velocity) { this.x = x; this.y = y; this.radius = Math.random() * radius + 1; this.color = color; this.velocity = velocity || { x: (Math.random() - 0.5) * 4, y: (Math.random() - 0.5) * 4 }; this.alpha = 1; this.friction = 0.98; } draw() { ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore(); } update() { this.velocity.x *= this.friction; this.velocity.y *= this.friction; this.x += this.velocity.x; this.y += this.velocity.y; this.alpha -= 0.02; this.draw(); } }
+    class Collectible { constructor(color) { this.radius = 12; this.x = Math.random() * (canvasWidth - this.radius * 2) + this.radius; this.y = -this.radius; this.speed = gameSpeed + 0.5; this.color = color; } draw(symbol) { ctx.fillStyle = this.color; ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.shadowColor = this.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (symbol) { ctx.fillStyle = 'white'; ctx.font = 'bold 14px Courier New'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, this.x, this.y + 1); } ctx.shadowBlur = 0; } update() { this.y += this.speed; } }
+    class Coin extends Collectible { constructor(x, y) { super('#FFD700'); if (x) this.x=x; if(y)this.y=y; } draw() { super.draw('$'); if(!isMultiplayer){this.update();} } }
+    class ShieldPowerUp extends Collectible { constructor() { super('#39FF14'); } draw() { super.draw('S'); if(!isMultiplayer){this.update();} } }
+    class MagnetPowerUp extends Collectible { constructor() { super('#FF00FF'); } draw() { super.draw('M'); if(!isMultiplayer){this.update();} } }
+    class WeaponPowerUp extends Collectible { constructor() { super('#FF6347'); } draw() { super.draw('W'); if(!isMultiplayer){this.update();} } }
+
+    function init() { // This is now for SINGLE PLAYER mode
+        isMultiplayer = false;
+        setCanvasDimensions(); player = new Player(); stars = []; for (let i = 0; i < 150; i++) stars.push(new Star());
+        asteroids = []; coins = []; powerUps = []; particles = []; bullets = [];
+        score = 0; coinsCollected = 0; frameCount = 0; gameOver = false; gameSpeed = 2.0; asteroidSpawnRate = 120;
+        startScreen.style.display = 'none'; gameOverScreen.style.display = 'none'; shopScreen.style.display = 'none'; settingsScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameStatsContainer.style.display = 'flex';
+        updateStatsDisplay(); if (isMobileDevice()) mobileControls.style.display = 'flex'; 
+        restartButton.textContent = "Try Again (Single Player)";
+        gameLoop();
+    }
+    
+    // 5. MULTIPLAYER: New game loop designed for multiplayer
+    function multiPlayerGameLoop() {
+        if (gameOver) return;
+        requestAnimationFrame(multiPlayerGameLoop);
+        ctx.fillStyle = 'rgba(0, 5, 15, 0.2)'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        stars.forEach(star => star.update());
+
+        // --- SHARED LOGIC: RENDER EVERYTHING ---
+        // The Host is the source of truth, so both players just draw what the Host tells them to.
+        asteroids.forEach(a => a.draw());
+        coins.forEach(c => c.draw());
+        particles.forEach((p, i) => { if (p.alpha <= 0.02) particles.splice(i, 1); else p.update(); });
+        
+        // Draw all players from the 'players' object
+        for (const id in players) {
+            const p = players[id];
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.moveTo(p.x + player.width / 2, p.y); // Use a template player for dimensions
+            ctx.lineTo(p.x, p.y + player.height);
+            ctx.lineTo(p.x + player.width, p.y + player.height);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // --- HOST-ONLY LOGIC: SIMULATE THE GAME ---
+        if (isHost) {
+            frameCount++;
+            // Move local host player based on input
+            const hostPlayer = players[myPeerId];
+            if (keys['ArrowLeft'] && hostPlayer.x > 0) hostPlayer.x -= player.speed;
+            if (keys['ArrowRight'] && hostPlayer.x < canvasWidth - player.width) hostPlayer.x += player.speed;
+
+            // Spawning logic
+            if (frameCount % Math.floor(asteroidSpawnRate) === 0) asteroids.push(new Asteroid());
+            if (frameCount % 200 === 0) coins.push(new Coin());
+            
+            // Update asteroids and check for collisions
+            asteroids.forEach((asteroid, aIndex) => {
+                asteroid.y += asteroid.speed; // Manually update position
+                for (const id in players) {
+                    const p = players[id];
+                    const dist = Math.hypot(p.x + player.width / 2 - asteroid.x, p.y + player.height / 2 - asteroid.y);
+                    if (dist < asteroid.radius + player.width / 2) {
+                        endGame(id); // Pass the ID of the player who lost
+                        return;
+                    }
+                }
+                if (asteroid.y > canvasHeight + asteroid.radius) asteroids.splice(aIndex, 1);
+            });
+
+            // Update coins and check for collection
+            coins.forEach((coin, cIndex) => {
+                coin.y += coin.speed;
+                for (const id in players) {
+                    const p = players[id];
+                    const pRect = { x: p.x, y: p.y, width: player.width, height: player.height };
+                    if (checkCollision(pRect, coin)) {
+                        p.coins++;
+                        p.score += 100;
+                        createExplosion(coin.x, coin.y, coin.color, 10);
+                        coins.splice(cIndex, 1);
+                        break;
+                    }
+                }
+                if (coin.y > canvasHeight + coin.radius) coins.splice(cIndex, 1);
+            });
+            
+            gameSpeed += 0.001; if (asteroidSpawnRate > 40) asteroidSpawnRate -= 0.02;
+            
+            // Broadcast the complete game state to the client
+            const gameState = {
+                type: 'gameState',
+                asteroids: asteroids.map(a => ({ x: a.x, y: a.y, radius: a.radius, rotation: a.rotation, color: a.color })),
+                coins: coins.map(c => ({ x: c.x, y: c.y, radius: c.radius, color: c.color })),
+                players: players,
+                score: players[myPeerId].score // Or a global score
+            };
+            if (conn && conn.open) conn.send(gameState);
+        }
+
+        // --- CLIENT-ONLY LOGIC: SEND INPUT TO HOST ---
+        else {
+            if (conn && conn.open) {
+                if (keys['ArrowLeft']) conn.send({ type: 'input', key: 'ArrowLeft' });
+                if (keys['ArrowRight']) conn.send({ type: 'input', key: 'ArrowRight' });
+            }
+        }
+        updateStatsDisplay();
+    }
+
+    function gameLoop() { // ORIGINAL game loop for single player
+        if (gameOver) return;
+        requestAnimationFrame(gameLoop);
+        ctx.fillStyle = 'rgba(0, 5, 15, 0.2)'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        stars.forEach(star => star.update());
+        player.update(); // The single player object updates itself
+        frameCount++;
+        if (frameCount % Math.floor(asteroidSpawnRate) === 0) asteroids.push(new Asteroid());
+        if (frameCount % 200 === 0) coins.push(new Coin());
+        if (frameCount % 800 === 0) powerUps.push(new ShieldPowerUp());
+        if (frameCount % 1200 === 0) powerUps.push(new MagnetPowerUp());
+        if (frameCount % 1000 === 0) powerUps.push(new WeaponPowerUp());
+        if (player.magnetActive) { player.magnetTimer--; if (player.magnetTimer <= 0) player.magnetActive = false; }
+        if (player.weaponActive) { player.weaponTimer--; if (player.weaponTimer <= 0) player.weaponActive = false; }
+        bullets.forEach((bullet, bIndex) => {
+            bullet.update(); bullet.draw();
+            asteroids.forEach((asteroid, aIndex) => {
+                if (bullet.x < asteroid.x + asteroid.radius && bullet.x + bullet.width > asteroid.x - asteroid.radius && bullet.y < asteroid.y + asteroid.radius && bullet.y + bullet.height > asteroid.y - asteroid.radius) {
+                    asteroid.takeDamage(bullet.damage); createExplosion(bullet.x, bullet.y, 'rgba(255, 255, 100, 0.8)', 3); bullets.splice(bIndex, 1);
+                    if (asteroid.health <= 0) {
+                        createExplosion(asteroid.x, asteroid.y, asteroid.color, 15); score += 50;
+                        const numCoins = Math.floor(Math.random() * 3) + 1; for(let i = 0; i < numCoins; i++) { coins.push(new Coin(asteroid.x + (Math.random() - 0.5) * 20, asteroid.y + (Math.random() - 0.5) * 20)); }
+                        asteroids.splice(aIndex, 1);
+                    }
+                }
+            });
+            if (bullet.y < 0) bullets.splice(bIndex, 1);
+        });
+        asteroids.forEach((asteroid, index) => {
+            asteroid.update();
+            const dist = Math.hypot(player.x + player.width / 2 - asteroid.x, player.y + player.height / 2 - asteroid.y);
+            if (dist < asteroid.radius + player.width / 2) {
+                if (player.shieldActive) { player.shieldActive = false; createExplosion(asteroid.x, asteroid.y, asteroid.color, 15); asteroids.splice(index, 1); } 
+                else { createExplosion(player.x + player.width / 2, player.y + player.height / 2, '#f44336', 30); endGame(); }
+            }
+            if (asteroid.y > canvasHeight + asteroid.radius) asteroids.splice(index, 1);
+        });
+        coins.forEach((coin, index) => {
+            if (player.magnetActive) {
+                const dist = Math.hypot(player.x + player.width / 2 - coin.x, player.y + player.height / 2 - coin.y);
+                if (dist < player.magnetRadius) { coin.x += (player.x + player.width/2 - coin.x) * 0.1; coin.y += (player.y + player.height/2 - coin.y) * 0.1; }
+            }
+            coin.draw(); 
+            if (checkCollision(player, coin)) { coinsCollected++; totalCoins++; createExplosion(coin.x, coin.y, coin.color, 10); coins.splice(index, 1); } 
+            else if (coin.y > canvasHeight + coin.radius) coins.splice(index, 1);
+        });
+        powerUps.forEach((powerUp, index) => { 
+            powerUp.draw(); 
+            if (checkCollision(player, powerUp)) { 
+                if (powerUp instanceof ShieldPowerUp) player.shieldActive = true; 
+                else if (powerUp instanceof MagnetPowerUp) { player.magnetActive = true; player.magnetTimer = player.magnetDuration; }
+                else if (powerUp instanceof WeaponPowerUp) { player.weaponActive = true; player.weaponTimer = player.weaponDuration; }
+                createExplosion(powerUp.x, powerUp.y, powerUp.color, 20); powerUps.splice(index, 1); 
+            } else if (powerUp.y > canvasHeight + powerUp.radius) powerUps.splice(index, 1);
+        });
+        particles.forEach((particle, index) => { if (particle.alpha <= 0.02) particles.splice(index, 1); else particle.update(); });
+        score++; gameSpeed += 0.0015; if (asteroidSpawnRate > 30) asteroidSpawnRate -= 0.03;
+        updateStatsDisplay();
+    }
+    
+    function createExplosion(x,y,c,n) { for (let i=0;i<n;i++) particles.push(new Particle(x,y,3,c));}
+    function checkCollision(p,c){const cX=Math.max(p.x,Math.min(c.x,p.x+p.width));const cY=Math.max(p.y,Math.min(c.y,p.y+p.height));return Math.hypot(c.x-cX,c.y-cY)<c.radius;}
+    
+    function endGame(loserId = null) { // Modified to handle multiplayer endings
+        if (gameOver) return; // Prevent this from running multiple times
+        gameOver = true;
+        keys = {};
+
+        if(isMultiplayer) {
+            if(conn && conn.open) {
+                conn.send({ type: 'gameOver', loser: loserId });
+                setTimeout(() => conn.close(), 500); // give time for message to send
+            }
+            if (loserId) {
+                gameOverTitle.textContent = loserId === myPeerId ? "You Lost!" : "You Won!";
+            }
+            const myFinalStats = players[myPeerId];
+            gameOverMessage.innerHTML = `You collected ${myFinalStats.coins}<span class="coin-icon"></span>. Your Score: ${myFinalStats.score}`;
+            restartButton.textContent = "Multiplayer Menu";
+            restartButton.onclick = () => {
+                gameOverScreen.style.display = 'none';
+                multiplayerScreen.style.display = 'flex';
+                resetMultiplayerUI();
+            };
+        } else {
+            // Original single player logic
+            localStorage.setItem('cosmicCourierTotalCoins', totalCoins.toString());
+            runCoinsEl.textContent = coinsCollected;
+            if (score > highScore) { highScore = score; localStorage.setItem('cosmicCourierHighScore', highScore); }
+            if (coinsCollected > highCoinScore) { highCoinScore = coinsCollected; localStorage.setItem('cosmicCourierHighCoins', highCoinScore); }
+            restartButton.textContent = "Try Again (Single Player)";
+            restartButton.onclick = init;
+            gameOverTitle.textContent = "Game Over";
+            gameOverMessage.innerHTML = `You collected <span id="run-coins">${coinsCollected}</span><span class="coin-icon"></span> this run.`;
+        }
+        
+        updateStatsDisplay();
+        if (isMobileDevice()) mobileControls.style.display = 'none';
+        gameOverScreen.style.display = 'flex';
+    }
+
+    function updateStatsDisplay() {
+        if (isMultiplayer) {
+            if(players[myPeerId]) {
+                const myStats = players[myPeerId];
+                scoreEl.textContent = 'Score: ' + myStats.score;
+                coinScoreEl.innerHTML = `<span class="coin-icon"></span>${myStats.coins}`;
+            }
+            highScoreEl.style.display = 'none'; // High score is irrelevant in MP
+            totalCoinsStatEl.style.display = 'none';
+        } else {
+            scoreEl.textContent = 'Score: ' + score;
+            highScoreEl.textContent = 'High Score: ' + highScore;
+            coinScoreEl.innerHTML = `<span class="coin-icon"></span>${coinsCollected}`;
+            totalCoinsStatEl.innerHTML = `Total Coins: ${totalCoins}<span class="coin-icon"></span>`;
+            highScoreEl.style.display = 'inline';
+            totalCoinsStatEl.style.display = 'inline';
+        }
+    }
+
+    // --- SHOP LOGIC (No changes needed) ---
+    function buyUpgrade(type) { /* ... */ }
+    function setEquippedLevel(type, newLevel) { /* ... */ }
+    function buySkin(skinId) { /* ... */ }
+    function equipSkin(skinId) { /* ... */ }
+    function populateShop() { /* ... */ }
+    // (The shop functions from your original file are fine, I've omitted them here for brevity but they should be included)
+
+
+    // 6. MULTIPLAYER: Core connection and game start functions
+    function initializePeer(id) {
+        peer = new Peer(id);
+        peer.on('open', (id) => {
+            myPeerId = id;
+            console.log('My peer ID is: ' + id);
+            if (isHost) {
+                mpStatus.textContent = `Room Created! ID: ${id}`;
+                roomIdInput.value = id;
+                roomIdInput.disabled = true;
+                createRoomButton.disabled = true;
+                joinRoomButton.disabled = true;
+            }
+        });
+        peer.on('connection', (connection) => {
+            console.log('A player has connected!');
+            conn = connection;
+            setupConnectionEvents();
+        });
+        peer.on('error', (err) => {
+            console.error(err);
+            mpStatus.textContent = `Error: ${err.type}. Try another ID.`;
+            resetMultiplayerUI();
+        });
+    }
+
+    function setupConnectionEvents() {
+        conn.on('open', () => {
+            if (isHost) {
+                mpStatus.textContent = 'Player 2 connected! Starting game...';
+                // The Host defines the starting state for both players
+                players[myPeerId] = { x: canvasWidth / 2 - 50, y: canvasHeight - 80, score: 0, coins: 0, color: '#0ff' };
+                players[conn.peer] = { x: canvasWidth / 2 + 50, y: canvasHeight - 80, score: 0, coins: 0, color: '#ff4500' };
+                setTimeout(startMultiplayerGame, 2000);
+            }
+        });
+        conn.on('data', (data) => {
+            if (isHost) { // Host receives input from Client
+                if (data.type === 'input') {
+                    const clientPlayer = players[conn.peer];
+                    if (data.key === 'ArrowLeft' && clientPlayer.x > 0) clientPlayer.x -= player.speed;
+                    if (data.key === 'ArrowRight' && clientPlayer.x < canvasWidth - player.width) clientPlayer.x += player.speed;
+                }
+            } else { // Client receives authoritative state from Host
+                if (data.type === 'gameState') {
+                    // Overwrite local state with the host's state
+                    asteroids = data.asteroids;
+                    coins = data.coins;
+                    players = data.players;
+                } else if (data.type === 'gameOver') {
+                    endGame(data.loser);
+                }
+            }
+        });
+        conn.on('close', () => {
+            if(!gameOver) endGame();
+            mpStatus.textContent = 'Player disconnected.';
+        });
+    }
+    
+    function startMultiplayerGame() {
+        isMultiplayer = true;
+        setCanvasDimensions();
+        player = new Player(); // We use this as a template for size, speed etc.
+        stars = []; for (let i = 0; i < 150; i++) stars.push(new Star());
+        asteroids = []; coins = []; particles = [];
+        frameCount = 0; gameOver = false; gameSpeed = 2.0; asteroidSpawnRate = 120;
+        
+        // Hide all menus and show game canvas
+        startScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameOverScreen.style.display = 'none';
+        gameStatsContainer.style.display = 'flex';
+        if (isMobileDevice()) mobileControls.style.display = 'flex';
+        
+        multiPlayerGameLoop(); // Start the correct game loop
+    }
+
+    function resetMultiplayerUI() {
+        if(peer) peer.destroy();
+        isHost = false;
+        roomIdInput.value = '';
+        roomIdInput.disabled = false;
+        createRoomButton.disabled = false;
+        joinRoomButton.disabled = false;
+        mpStatus.textContent = "Create a room or join a friend's.";
+    }
+
+    // --- EVENT LISTENERS ---
+    window.addEventListener('keydown', e => keys[e.key] = true); window.addEventListener('keyup', e => keys[e.key] = false);
+    startButton.addEventListener('click', init); 
+    restartButton.addEventListener('click', init); // Default action is single player
+    shopButton.addEventListener('click', () => { startScreen.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
+    closeShopButton.addEventListener('click', () => { shopScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+    settingsButton.addEventListener('click', () => { startScreen.style.display = 'none'; settingsScreen.style.display = 'flex'; });
+    closeSettingsButton.addEventListener('click', () => { settingsScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+    goToMenuButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); });
+    goToShopButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
+    resetHighScoreButton.addEventListener('click', () => { if (confirm('Are you sure? This cannot be undone.')) { highScore = 0; localStorage.setItem('cosmicCourierHighScore', 0); alert('High Score reset!'); } });
+    resetHighCoinsButton.addEventListener('click', () => { if (confirm('Are you sure? This cannot be undone.')) { highCoinScore = 0; localStorage.setItem('cosmicCourierHighCoins', 0); alert('High Coins record reset!'); } });
+    if (isMobileDevice()) { leftBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowLeft'] = true; }, { passive: false }); leftBtn.addEventListener('touchend', () => keys['ArrowLeft'] = false); rightBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowRight'] = true; }, { passive: false }); rightBtn.addEventListener('touchend', () => keys['ArrowRight'] = false); }
+    window.addEventListener('resize', () => { setCanvasDimensions(); if (player && !gameOver) { player.y = canvasHeight - player.height - (isMobileDevice() ? 150 : 30); } });
+
+    // 7. MULTIPLAYER: Event Listeners for the new menu
+    multiplayerButton.addEventListener('click', () => {
+        startScreen.style.display = 'none';
+        multiplayerScreen.style.display = 'flex';
+    });
+
+    backToMenuButton.addEventListener('click', () => {
+        multiplayerScreen.style.display = 'none';
+        startScreen.style.display = 'flex';
+        resetMultiplayerUI();
+    });
+
+    createRoomButton.addEventListener('click', () => {
+        isHost = true;
+        let roomId = 'cosmic' + Math.floor(Math.random() * 9000 + 1000);
+        initializePeer(roomId);
+    });
+
+    joinRoomButton.addEventListener('click', () => {
+        isHost = false;
+        const roomId = roomIdInput.value.trim();
+        if (!roomId) {
+            mpStatus.textContent = 'Please enter a Room ID to join.';
+            return;
+        }
+        initializePeer(); // Initialize with a random ID
+        
+        setTimeout(() => { // Allow time for our peer to get its ID
+            conn = peer.connect(roomId);
+            mpStatus.textContent = `Connecting to room: ${roomId}...`;
+            setupConnectionEvents();
+        }, 500);
+    });
+
+    setCanvasDimensions();
+    gameStatsContainer.style.display = 'none';
+</script>
+
+</body>
+</html>

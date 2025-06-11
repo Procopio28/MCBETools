@@ -3,14 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Hostile Mob-Dex</title>
+    <title>Minecraft Mob-Dex</title>
+    <link rel="stylesheet" media="screen" href="https://fontlibrary.org//face/minecraftia" type="text/css"/>
     <style>
+        @font-face {
+            font-family: 'Minecraftia';
+            src: url('./styles/Minecraft.otf') format('opentype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #333;
-            color: #fff;
+            background-image: url('./images/Minecraft.jpg');
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: cover;
+            font-family: 'Minecraftia', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #FFFFFF;
             margin: 0;
             padding: 20px;
+        }
+
+        h1 {
+            color: #FFFFFF;
+            font-size: 2.5em;
+            text-align: center;
+            text-shadow: 3px 3px #3a3a3a;
+            margin-bottom: 30px;
         }
         
         a {
@@ -18,66 +37,83 @@
             color: inherit;
         }
 
-        h1 {
-            text-align: center;
-            color: #52D017;
-            text-shadow: 2px 2px 4px #000;
-        }
-
-        .pokedex-container {
+        .mob-dex-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 20px;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         .mob-card {
-            background-color: #4a4a4a;
-            border: 2px solid #222;
-            border-radius: 15px;
-            padding: 15px;
             text-align: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
+            padding: 15px;
+            border: 3px solid #000000;
+            background-color: #c6c6c6;
+            background-image: linear-gradient(to top, #7f7f7f 5px, transparent 5px),
+                              linear-gradient(to bottom, #ffffff 5px, transparent 5px),
+                              linear-gradient(to left, #ffffff 5px, transparent 5px),
+                              linear-gradient(to right, #ffffff 5px, #c6c6c6 5px);
+            color: #424242;
+            text-shadow: 2px 2px #ffffff;
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+            cursor: pointer;
             height: 100%;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .mob-card:hover {
-            transform: scale(1.05);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
-            border-color: #52D017;
+            border-color: #333;
+            background-image: linear-gradient(to top, #8a8a8a 5px, transparent 5px),
+                              linear-gradient(to bottom, #ffffff 5px, transparent 5px),
+                              linear-gradient(to left, #ffffff 5px, transparent 5px),
+                              linear-gradient(to right, #ffffff 5px, #d1d1d1 5px);
+        }
+
+        .mob-card:active {
+            transform: translateY(3px);
+            padding-top: 18px;
+            padding-bottom: 12px;
+            border-color: #000000;
+            background-image: linear-gradient(to top, #ffffff 3px, transparent 3px),
+                              linear-gradient(to bottom, #ffffff 3px, transparent 3px),
+                              linear-gradient(to left, #ffffff 3px, transparent 3px),
+                              linear-gradient(to right, #ffffff 3px, #7f7f7f 3px);
         }
 
         .mob-card img {
-            max-width: 100px;
+            max-width: 96px;
             height: auto;
             image-rendering: pixelated;
             background-color: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-            padding: 5px;
+            border: 2px solid #555;
+            margin: 0 auto 10px auto;
+            display: block;
         }
 
         .mob-card h2 {
-            margin: 10px 0 5px 0;
-            color: #fff;
+            margin: 10px 0 10px 0;
+            font-size: 1.2em;
         }
 
         .mob-card .description {
             font-size: 0.9em;
-            color: #ccc;
-            height: 60px;
-            overflow: hidden;
+            color: #505050;
+            line-height: 1.4;
+            flex-grow: 1;
         }
 
         .mob-card .stats {
-            margin-top: 10px;
-            font-size: 0.8em;
-            color: #ddd;
-            background-color: #3a3a3a;
-            padding: 5px;
-            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #424242;
+            background-color: rgba(0, 0, 0, 0.1);
+            padding: 8px;
+            border-top: 2px solid #555;
+            border-bottom: 2px solid #555;
         }
     </style>
 </head>
@@ -85,7 +121,7 @@
 
     <h1>Minecraft Hostile Mob-Dex</h1>
     
-    <div id="pokedex" class="pokedex-container"></div>
+    <div id="pokedex" class="mob-dex-container"></div>
 
     <script>
         const hostileMobs = [
@@ -114,10 +150,22 @@
                 stats: "Health: 16 | Attack: 2-3"
             },
             {
+                name: "Cave Spider",
+                imageUrl: "./images/cavespider.png",
+                description: "A smaller, more dangerous spider found in mineshafts that inflicts poison.",
+                stats: "Health: 12 | Attack: 2 + Poison"
+            },
+            {
                 name: "Enderman",
                 imageUrl: "./images/enderman.png",
                 description: "A neutral mob that becomes hostile when looked at. Can teleport.",
                 stats: "Health: 40 | Attack: 7"
+            },
+            {
+                name: "Slime",
+                imageUrl: "./images/slime.png",
+                description: "A bouncy, cube-shaped mob found in swamps that splits on death.",
+                stats: "Health: Varies | Attack: Varies"
             },
             {
                 name: "Witch",
@@ -126,10 +174,34 @@
                 stats: "Health: 26 | Attack: Potions"
             },
             {
+                name: "Husk",
+                imageUrl: "./images/husk.png",
+                description: "A zombie variant from deserts that doesn't burn in sunlight and inflicts hunger.",
+                stats: "Health: 20 | Attack: 2.5-4.5 + Hunger"
+            },
+            {
+                name: "Stray",
+                imageUrl: "./images/stray.png",
+                description: "A skeleton variant from cold biomes that shoots arrows of Slowness.",
+                stats: "Health: 20 | Attack: 1-5 (Slowness Arrow)"
+            },
+            {
+                name: "Drowned",
+                imageUrl: "./images/drowned.png",
+                description: "An underwater zombie variant that can spawn with a trident.",
+                stats: "Health: 20 | Attack: 2.5-9"
+            },
+            {
                 name: "Ghast",
                 imageUrl: "./images/ghast.png",
                 description: "A large, flying mob in the Nether that shoots explosive fireballs.",
                 stats: "Health: 10 | Attack: Varies (Fireball)"
+            },
+            {
+                name: "Magma Cube",
+                imageUrl: "./images/magmacube.png",
+                description: "A Nether-equivalent of a Slime that is immune to fire and lava.",
+                stats: "Health: Varies | Attack: Varies"
             },
             {
                 name: "Blaze",
@@ -156,10 +228,28 @@
                 stats: "Health: 30 | Attack: 4-9 (Laser)"
             },
             {
+                name: "Elder Guardian",
+                imageUrl: "./images/elderguardian.png",
+                description: "A powerful boss version of the Guardian that inflicts Mining Fatigue.",
+                stats: "Health: 80 | Attack: 5-12 (Laser)"
+            },
+            {
                 name: "Shulker",
                 imageUrl: "./images/shulker.png",
                 description: "A mob found in End cities that shoots projectiles causing levitation.",
                 stats: "Health: 30 | Attack: 4 (Projectile)"
+            },
+            {
+                name: "Silverfish",
+                imageUrl: "./images/silverfish.png",
+                description: "A small, bug-like mob that hides in stone blocks in strongholds.",
+                stats: "Health: 8 | Attack: 1"
+            },
+            {
+                name: "Endermite",
+                imageUrl: "./images/endermite.png",
+                description: "A tiny hostile mob that can spawn when an Ender Pearl is used.",
+                stats: "Health: 8 | Attack: 2"
             },
             {
                 name: "Vindicator",
@@ -172,6 +262,12 @@
                 imageUrl: "./images/evoker.png",
                 description: "A spell-casting illager that summons vexes and fangs.",
                 stats: "Health: 24 | Attack: 6 (Fangs)"
+            },
+            {
+                name: "Vex",
+                imageUrl: "./images/vex.png",
+                description: "A small, flying mob summoned by Evokers that can phase through walls.",
+                stats: "Health: 14 | Attack: 5-13"
             },
             {
                 name: "Pillager",
@@ -208,6 +304,12 @@
                 imageUrl: "./images/warden.png",
                 description: "A powerful blind mob found in the Deep Dark, hunting by sound.",
                 stats: "Health: 500 | Attack: 16-45"
+            },
+            {
+                name: "Wither",
+                imageUrl: "./images/wither.png",
+                description: "A powerful, player-created boss mob with three heads.",
+                stats: "Health: 300-600 | Attack: Wither Skulls"
             }
         ];
 
@@ -223,9 +325,11 @@
                 card.className = 'mob-card';
 
                 card.innerHTML = `
-                    <img src="${mob.imageUrl}" alt="${mob.name}" loading="lazy">
-                    <h2>${mob.name}</h2>
-                    <p class="description">${mob.description}</p>
+                    <div>
+                        <img src="${mob.imageUrl}" alt="${mob.name}" loading="lazy">
+                        <h2>${mob.name}</h2>
+                        <p class="description">${mob.description}</p>
+                    </div>
                     <p class="stats">${mob.stats}</p>
                 `;
 
