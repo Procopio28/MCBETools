@@ -1,572 +1,644 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-    <title>Cosmic Courier</title>
-    <style>
-        body { margin: 0; padding: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
-        canvas { display: block; }
-        .ui-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
-        .menu { background-color: rgba(0, 0, 0, 0.8); padding: 30px; border-radius: 10px; pointer-events: all; border: 2px solid #0ff; box-shadow: 0 0 25px #0ff; min-width: 340px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
-        h1 { font-size: 3em; margin: 0 0 10px 0; color: #0ff; text-shadow: 0 0 10px #0ff; }
-        h2 { font-size: 1.5em; margin: 20px 0 10px 0; color: #0ff; text-shadow: 0 0 5px #0ff; border-bottom: 1px solid rgba(0,255,255,0.4); padding-bottom: 5px; }
-        p { font-size: 1.2em; margin: 5px 0; }
-        .input-field { padding: 10px; font-size: 1.1em; width: 220px; text-align: center; background: #000; border: 1px solid #0ff; color: #fff; margin-bottom: 10px; font-family: 'Courier New', Courier, monospace; }
-        .stats-container { z-index: 10; position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; display: flex; justify-content: space-between; padding: 20px; font-size: 1.2em; text-shadow: 0 0 5px #fff; pointer-events: none; }
-        .stats-left, .stats-right { display: flex; flex-direction: column; }
-        .stats-left { text-align: left; }
-        .stats-right { text-align: right; }
-        .button { padding: 10px 20px; font-size: 1.2em; background-color: #0ff; color: #000; border: none; cursor: pointer; border-radius: 5px; margin: 10px 0; font-family: 'Courier New', Courier, monospace; font-weight: bold; width: 220px; }
-        .button-secondary { background-color: transparent; border: 1px solid #0ff; color: #0ff; }
-        .button:hover { box-shadow: 0 0 15px #0ff; }
-        .button:disabled { background-color: #555; color: #999; border-color: #555; cursor: not-allowed; box-shadow: none; }
-        #mobile-controls { display: none; position: absolute; bottom: 0; left: 0; width: 100%; height: 120px; z-index: 100; padding: 20px; box-sizing: border-box; justify-content: space-between; align-items: center; }
-        .control-button { width: 45%; height: 100%; background-color: rgba(0, 255, 255, 0.2); border: 2px solid #0ff; color: #0ff; font-size: 2.5em; font-weight: bold; font-family: 'Courier New', Courier, monospace; border-radius: 10px; opacity: 0.7; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-        .control-button:active { background-color: rgba(0, 255, 255, 0.5); opacity: 1; }
-        .coin-icon { display: inline-block; width: 1em; height: 1em; background: #FFD700; border-radius: 50%; vertical-align: -0.15em; margin-right: 8px; box-shadow: 0 0 5px #FFD700; }
-        .shop-section { margin-bottom: 20px; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 5px; background-color: rgba(0, 255, 255, 0.05); border-radius: 5px; text-align: left;}
-        .shop-details { display: flex; align-items: center; flex-grow: 1; }
-        .shop-preview { width: 30px; height: 30px; border: 2px solid #fff; margin-right: 15px; border-radius: 5px; flex-shrink: 0; }
-        .shop-info { display: flex; flex-direction: column; flex-grow: 1; }
-        .shop-name { font-weight: bold; }
-        .shop-desc, .shop-price { font-size: 0.9em; opacity: 0.8; }
-        .shop-price .coin-icon { width: 0.8em; height: 0.8em; }
-        .shop-actions .button { width: 100px; padding: 5px 10px; font-size: 0.9em; margin: 0; }
-        .custom-color-picker { background: transparent; border: 1px solid #0ff; width: 30px; height: 30px; padding: 0; cursor: pointer; vertical-align: middle; margin-left: 10px;}
-        #total-coins-display .coin-icon, #total-coins-stat .coin-icon { width: 0.8em; height: 0.8em; vertical-align: baseline; margin-left: 5px; }
-        .gameover-buttons .button { width: 220px; margin: 5px 0; }
-        .shop-name-wrapper { display: flex; justify-content: space-between; align-items: center; }
-        .level-controls { display: flex; align-items: center; }
-        .level-arrow { cursor: pointer; font-size: 1.4em; padding: 0 8px; user-select: none; color: #0ff; font-weight: bold; }
-        .level-arrow.disabled { color: #555; cursor: not-allowed; }
-        .level-text { font-size: 0.9em; min-width: 80px; text-align: center; }
-        .instructions { text-align: left; max-width: 450px; }
-        .instructions p { font-size: 1.1em; line-height: 1.6; }
-        .instructions strong { color: #0ff; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<title>Cosmic Courier</title>
+<style>
+body { margin: 0; padding: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
+canvas { display: block; }
+.ui-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
+.menu { background-color: rgba(0, 0, 0, 0.8); padding: 30px; border-radius: 10px; pointer-events: all; border: 2px solid #0ff; box-shadow: 0 0 25px #0ff; min-width: 340px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+h1 { font-size: 3em; margin: 0 0 10px 0; color: #0ff; text-shadow: 0 0 10px #0ff; }
+h2 { font-size: 1.5em; margin: 20px 0 10px 0; color: #0ff; text-shadow: 0 0 5px #0ff; border-bottom: 1px solid rgba(0,255,255,0.4); padding-bottom: 5px; }
+p { font-size: 1.2em; margin: 5px 0; }
+.stats-container { z-index: 10; position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; display: flex; justify-content: space-between; padding: 20px; font-size: 1.2em; text-shadow: 0 0 5px #fff; pointer-events: none; }
+.stats-left, .stats-right { display: flex; flex-direction: column; }
+.stats-left { text-align: left; }
+.stats-right { text-align: right; }
+.button { padding: 10px 20px; font-size: 1.2em; background-color: #0ff; color: #000; border: none; cursor: pointer; border-radius: 5px; margin: 10px 0; font-family: 'Courier New', Courier, monospace; font-weight: bold; width: 220px; }
+.button-secondary { background-color: transparent; border: 1px solid #0ff; color: #0ff; }
+.button:hover { box-shadow: 0 0 15px #0ff; }
+.button:disabled { background-color: #555; color: #999; border-color: #555; cursor: not-allowed; box-shadow: none; }
+#mobile-controls { display: none; position: absolute; bottom: 0; left: 0; width: 100%; height: 120px; z-index: 100; padding: 20px; box-sizing: border-box; justify-content: space-between; align-items: center; }
+.control-button { width: 45%; height: 100%; background-color: rgba(0, 255, 255, 0.2); border: 2px solid #0ff; color: #0ff; font-size: 2.5em; font-weight: bold; font-family: 'Courier New', Courier, monospace; border-radius: 10px; opacity: 0.7; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.control-button:active { background-color: rgba(0, 255, 255, 0.5); opacity: 1; }
+.coin-icon { display: inline-block; width: 1em; height: 1em; background: #FFD700; border-radius: 50%; vertical-align: -0.15em; margin-right: 8px; box-shadow: 0 0 5px #FFD700; }
+.shop-section { margin-bottom: 20px; }
+.shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 5px; background-color: rgba(0, 255, 255, 0.05); border-radius: 5px; text-align: left;}
+.shop-details { display: flex; align-items: center; flex-grow: 1; }
+.shop-preview { width: 30px; height: 30px; border: 2px solid #fff; margin-right: 15px; border-radius: 5px; flex-shrink: 0; }
+.shop-info { display: flex; flex-direction: column; flex-grow: 1; }
+.shop-name { font-weight: bold; }
+.shop-desc, .shop-price { font-size: 0.9em; opacity: 0.8; }
+.shop-price .coin-icon { width: 0.8em; height: 0.8em; }
+.shop-actions .button { width: 100px; padding: 5px 10px; font-size: 0.9em; margin: 0; }
+.custom-color-picker { background: transparent; border: 1px solid #0ff; width: 30px; height: 30px; padding: 0; cursor: pointer; vertical-align: middle; margin-left: 10px;}
+#total-coins-display .coin-icon, #total-coins-stat .coin-icon { width: 0.8em; height: 0.8em; vertical-align: baseline; margin-left: 5px; }
+.gameover-buttons .button { width: 220px; margin: 5px 0; }
+.shop-name-wrapper { display: flex; justify-content: space-between; align-items: center; }
+.level-controls { display: flex; align-items: center; }
+.level-arrow { cursor: pointer; font-size: 1.4em; padding: 0 8px; user-select: none; color: #0ff; font-weight: bold; }
+.level-arrow.disabled { color: #555; cursor: not-allowed; }
+.level-text { font-size: 0.9em; min-width: 80px; text-align: center; }
+.instructions { text-align: left; max-width: 450px; }
+.instructions p { font-size: 1.1em; line-height: 1.6; }
+.instructions strong { color: #0ff; }
+</style>
 </head>
 <body>
+<canvas id="gameCanvas"></canvas>
 
-    <canvas id="gameCanvas"></canvas>
-    
-    <div class="stats-container" id="gameStatsContainer" style="display: none;">
-        <div class="stats-left">
-            <span id="coin-score"><span class="coin-icon"></span>0</span>
-            <span id="total-coins-stat">Total Coins: 0</span>
-        </div>
-        <div class="stats-right">
-            <span id="score">Score: 0</span>
-            <span id="high-score">High Score: 0</span>
-        </div>
+<div class="stats-container" id="gameStatsContainer" style="display: none;">
+    <div class="stats-left">
+        <span id="coin-score"><span class="coin-icon"></span>0</span>
+        <span id="total-coins-stat">Total Coins: 0</span>
     </div>
+    <div class="stats-right">
+        <span id="score">Score: 0</span>
+        <span id="high-score">High Score: 0</span>
+    </div>
+</div>
 
-    <div id="startScreen" class="ui-panel">
-        <div class="menu">
-            <h1>Cosmic Courier</h1>
-            <p>Dodge asteroids, collect coins!</p>
-            <button class="button" id="startButton">Start Game</button>
-            <button class="button" id="multiplayerButton">Multiplayer</button>
-            <button class="button button-secondary" id="shopButton">Shop</button>
-            <button class="button button-secondary" id="howToPlayButton">How to Play</button>
-            <button class="button button-secondary" id="settingsButton">Settings</button>
-        </div>
+<div id="startScreen" class="ui-panel">
+    <div class="menu">
+        <h1>Cosmic Courier</h1>
+        <p>Dodge asteroids, collect coins!</p>
+        <button class="button" id="startButton">Start Game</button>
+        <button class="button" id="multiplayerButton">Multiplayer</button>
+        <button class="button button-secondary" id="shopButton">Shop</button>
+        <button class="button button-secondary" id="howToPlayButton">How to Play</button>
+        <button class="button button-secondary" id="settingsButton">Settings</button>
     </div>
+</div>
 
-    <div id="usernameScreen" class="ui-panel" style="display: none;">
-        <div class="menu">
-            <h1>Enter Your Name</h1>
-            <p>This will be shown to other players.</p>
-            <input type="text" id="username-input" class="input-field" placeholder="Courier" maxlength="12">
-            <button class="button" id="continueToLobbyButton">Continue</button>
-            <button class="button button-secondary" id="usernameBackToMenuButton">Back to Main Menu</button>
+<div id="howToPlayScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>How to Play</h1>
+        <div class="instructions">
+            <p><strong>Objective:</strong> Survive as long as possible by dodging asteroids. Collect coins to buy upgrades and new ship skins in the shop!</p>
+            <p><strong>Controls:</strong> Use the <strong>Left and Right Arrow Keys</strong> on your keyboard to move your ship. On mobile, use the on-screen buttons.</p>
+            <p><strong>Power-ups:</strong></p>
+            <ul>
+                <li><strong>(S) Shield:</strong> Protects you from one asteroid collision.</li>
+                <li><strong>(M) Magnet:</strong> Automatically pulls nearby coins towards you for a short time.</li>
+                <li><strong>(W) Weapon:</strong> Allows you to shoot and destroy asteroids for a short time.</li>
+            </ul>
         </div>
+        <button class="button" id="closeHowToPlayButton">Back to Menu</button>
     </div>
-    
-    <div id="howToPlayScreen" class="ui-panel" style="display: none;">
-        <div class="menu">
-            <h1>How to Play</h1>
-            <div class="instructions">
-                <p><strong>Objective:</strong> Survive as long as possible by dodging asteroids. Collect coins to buy upgrades and new ship skins in the shop!</p>
-                <p><strong>Controls:</strong> Use the <strong>Left and Right Arrow Keys</strong> on your keyboard to move your ship. On mobile, use the on-screen buttons.</p>
-                <p><strong>Power-ups:</strong></p>
-                <ul>
-                    <li><strong>(S) Shield:</strong> Protects you from one asteroid collision.</li>
-                    <li><strong>(M) Magnet:</strong> Automatically pulls nearby coins towards you for a short time.</li>
-                    <li><strong>(W) Weapon:</strong> Allows you to shoot and destroy asteroids for a short time.</li>
-                </ul>
-            </div>
-            <button class="button" id="closeHowToPlayButton">Back to Main Menu</button>
-        </div>
-    </div>
+</div>
 
-    <div id="multiplayerScreen" class="ui-panel" style="display: none;">
-        <div class="menu">
-            <h1>Multiplayer Lobby</h1>
-            <p id="mp-status">Create a room or join a friend's.</p>
-            <input type="text" id="room-id-input" class="input-field" placeholder="Enter Room ID">
-            <button class="button" id="createRoomButton">Create Room</button>
-            <button class="button" id="joinRoomButton">Join Room</button>
-            <button class="button button-secondary" id="backToMenuButton">Back to Main Menu</button>
-        </div>
+<div id="multiplayerScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>Multiplayer</h1>
+        <p id="mp-status">Create a room or join a friend's.</p>
+        <input type="text" id="room-id-input" placeholder="Enter Room ID" style="padding: 10px; font-size: 1.1em; width: 220px; text-align: center; background: #000; border: 1px solid #0ff; color: #fff; margin-bottom: 10px;">
+        <button class="button" id="createRoomButton">Create Room</button>
+        <button class="button" id="joinRoomButton">Join Room</button>
+        <button class="button button-secondary" id="backToMenuButton">Back to Main Menu</button>
     </div>
+</div>
 
-    <div id="settingsScreen" class="ui-panel" style="display: none;">
-        <div class="menu">
-            <h1>Settings</h1>
-            <p>Manage your saved data.</p>
-            <button class="button" id="resetHighScoreButton">Reset High Score</button>
-            <button class="button" id="resetProgressButton">Reset Progress (Coins & Upgrades)</button>
-            <button class="button button-secondary" id="closeSettingsButton">Back to Main Menu</button>
-        </div>
+<div id="settingsScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>Settings</h1>
+        <p>Manage your saved data.</p>
+        <button class="button" id="resetHighScoreButton">Reset High Score</button>
+        <button class="button" id="resetProgressButton">Reset Progress (Coins & Upgrades)</button>
+        <button class="button button-secondary" id="closeSettingsButton">Back to Menu</button>
     </div>
+</div>
 
-    <div id="shopScreen" class="ui-panel" style="display: none;">
-        <div class="menu">
-            <h1>Shop</h1>
-            <p id="total-coins-display">Total Coins: <span>0</span><span class="coin-icon"></span></p>
-            <div id="upgrades-section" class="shop-section"><h2>Ship Upgrades</h2><div id="upgrades-container"></div></div>
-            <div id="skins-section" class="shop-section"><h2>Ship Skins</h2><div id="skins-container"></div></div>
-            <button class="button" id="closeShopButton">Back to Main Menu</button>
-        </div>
+<div id="shopScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>Shop</h1>
+        <p id="total-coins-display">Total Coins: <span>0</span><span class="coin-icon"></span></p>
+        <div id="upgrades-section" class="shop-section"><h2>Ship Upgrades</h2><div id="upgrades-container"></div></div>
+        <div id="skins-section" class="shop-section"><h2>Ship Skins</h2><div id="skins-container"></div></div>
+        <button class="button" id="closeShopButton">Back to Menu</button>
     </div>
-    
-    <div id="gameOverScreen" class="ui-panel" style="display: none;">
-        <div class="menu">
-            <h1 id="gameOverTitle">Game Over</h1>
-            <p id="gameOverMessage">You collected <span id="run-coins">0</span><span class="coin-icon"></span> this run.</p>
-            <div class="gameover-buttons">
-                <button class="button" id="restartButton">Try Again (Single Player)</button>
-                <button class="button" id="rematchButton" style="display: none;">Offer Rematch</button>
-                <button class="button button-secondary" id="goToShopButton">Go to Shop</button>
-                <button class="button button-secondary" id="goToMenuButton">Main Menu</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="mobile-controls">
-        <button id="left-btn" class="control-button"><</button>
-        <button id="right-btn" class="control-button">></button>
-    </div>
+</div>
 
+<div id="gameOverScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1 id="gameOverTitle">Game Over</h1>
+        <p id="gameOverMessage">You collected <span id="run-coins">0</span><span class="coin-icon"></span> this run.</p>
+        <div class="gameover-buttons">
+            <button class="button" id="restartButton">Try Again (Single Player)</button>
+            <button class="button button-secondary" id="goToShopButton">Go to Shop</button>
+            <button class="button button-secondary" id="goToMenuButton">Main Menu</button>
+        </div>
+    </div>
+</div>
+
+<div id="mobile-controls">
+    <button id="left-btn" class="control-button"><</button>
+    <button id="right-btn" class="control-button">></button>
+</div>
+content_copy
+download
+Use code with caution.
 <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    // --- UI Elements ---
-    const allPanels = document.querySelectorAll('.ui-panel');
-    const startScreen = document.getElementById('startScreen');
-    const gameOverScreen = document.getElementById('gameOverScreen');
-    const gameStatsContainer = document.getElementById('gameStatsContainer');
-    const mobileControls = document.getElementById('mobile-controls');
-    
-    // Buttons
-    const startButton = document.getElementById('startButton');
-    const multiplayerButton = document.getElementById('multiplayerButton');
-    const shopButton = document.getElementById('shopButton');
-    const howToPlayButton = document.getElementById('howToPlayButton');
-    const settingsButton = document.getElementById('settingsButton');
-    const continueToLobbyButton = document.getElementById('continueToLobbyButton');
-    const usernameBackToMenuButton = document.getElementById('usernameBackToMenuButton');
-    const closeHowToPlayButton = document.getElementById('closeHowToPlayButton');
-    const createRoomButton = document.getElementById('createRoomButton');
-    const joinRoomButton = document.getElementById('joinRoomButton');
-    const backToMenuButton = document.getElementById('backToMenuButton');
-    const closeSettingsButton = document.getElementById('closeSettingsButton');
-    const closeShopButton = document.getElementById('closeShopButton');
-    const restartButton = document.getElementById('restartButton');
-    const rematchButton = document.getElementById('rematchButton');
-    const goToShopButton = document.getElementById('goToShopButton');
-    const goToMenuButton = document.getElementById('goToMenuButton');
-    const resetHighScoreButton = document.getElementById('resetHighScoreButton');
-    const resetProgressButton = document.getElementById('resetProgressButton');
-    
-    // Dynamic text/input elements
-    const gameOverTitle = document.getElementById('gameOverTitle');
-    const gameOverMessage = document.getElementById('gameOverMessage');
-    const totalCoinsDisplayP = document.getElementById('total-coins-display');
-    const skinsContainer = document.getElementById('skins-container');
-    const upgradesContainer = document.getElementById('upgrades-container');
-    const mpStatus = document.getElementById('mp-status');
-    const roomIdInput = document.getElementById('room-id-input');
-    const usernameInput = document.getElementById('username-input');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+// --- UI Elements ---
+const startScreen = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const gameOverTitle = document.getElementById('gameOverTitle');
+const gameOverMessage = document.getElementById('gameOverMessage');
+const shopScreen = document.getElementById('shopScreen');
+const settingsScreen = document.getElementById('settingsScreen');
+const howToPlayScreen = document.getElementById('howToPlayScreen');
+const startButton = document.getElementById('startButton');
+const restartButton = document.getElementById('restartButton');
+const shopButton = document.getElementById('shopButton');
+const settingsButton = document.getElementById('settingsButton');
+const howToPlayButton = document.getElementById('howToPlayButton');
+const closeShopButton = document.getElementById('closeShopButton');
+const closeSettingsButton = document.getElementById('closeSettingsButton');
+const closeHowToPlayButton = document.getElementById('closeHowToPlayButton');
+const goToShopButton = document.getElementById('goToShopButton');
+const goToMenuButton = document.getElementById('goToMenuButton');
+const resetHighScoreButton = document.getElementById('resetHighScoreButton');
+const resetProgressButton = document.getElementById('resetProgressButton');
+const gameStatsContainer = document.getElementById('gameStatsContainer');
+const scoreEl = document.getElementById('score');
+const highScoreEl = document.getElementById('high-score');
+const coinScoreEl = document.getElementById('coin-score');
+const totalCoinsStatEl = document.getElementById('total-coins-stat');
+const runCoinsEl = document.getElementById('run-coins');
+const mobileControls = document.getElementById('mobile-controls');
+const leftBtn = document.getElementById('left-btn');
+const rightBtn = document.getElementById('right-btn');
+const skinsContainer = document.getElementById('skins-container');
+const upgradesContainer = document.getElementById('upgrades-container');
+const totalCoinsDisplayP = document.getElementById('total-coins-display');
 
-    // --- Game State Variables ---
-    let canvasWidth, canvasHeight, player, stars, asteroids, particles, coins, powerUps, bullets, keys = {}, score = 0, coinsCollected = 0;
-    let gameOver = true, gameSpeed, asteroidSpawnRate, frameCount = 0;
-    
-    // Multiplayer State
-    let peer, conn, myPeerId, isHost = false, isMultiplayer = false, players = {};
-    let gameEndedProperly = false;
-    let rematchState = { me: false, opponent: false };
+// Multiplayer UI
+const multiplayerButton = document.getElementById('multiplayerButton');
+const multiplayerScreen = document.getElementById('multiplayerScreen');
+const createRoomButton = document.getElementById('createRoomButton');
+const joinRoomButton = document.getElementById('joinRoomButton');
+const backToMenuButton = document.getElementById('backToMenuButton');
+const roomIdInput = document.getElementById('room-id-input');
+const mpStatus = document.getElementById('mp-status');
 
-    // --- Static Game Data ---
-    const SKINS_DATA = [ { id: 'default', name: 'Default', price: 0, desc: "The classic courier.", shipColor: '#0ff', shieldColor: 'rgba(0, 255, 255, 0.2)', shieldStroke: '#00ffff' }, { id: 'ember', name: 'Ember', price: 50, desc: "A fiery variant.", shipColor: '#ff4500', shieldColor: 'rgba(255, 69, 0, 0.3)', shieldStroke: '#ff4500' }, { id: 'rogue', name: 'Rogue', price: 75, desc: "Sleek and dangerous.", shipColor: '#f44336', shieldColor: 'rgba(244, 67, 54, 0.3)', shieldStroke: '#f44336' }, { id: 'venom', name: 'Venom', price: 100, desc: "A toxic choice.", shipColor: '#7cfc00', shieldColor: 'rgba(124, 252, 0, 0.3)', shieldStroke: '#7cfc00' }, { id: 'nebula', name: 'Nebula', price: 150, desc: "Forged in the cosmos.", shipColor: '#9400d3', shieldColor: 'rgba(148, 0, 211, 0.3)', shieldStroke: '#9400d3' }, { id: 'custom', name: 'Custom Color', price: 250, desc: "Your own style. Shield color sets hue, game sets transparency.", isCustom: true } ];
-    const UPGRADES_DATA = { fireRate: { name: 'Fire Rate', desc: 'Increases bullet frequency.', prices: [50, 100, 200, 400], effects: [30, 25, 20, 15, 10] }, damage: { name: 'Bullet Damage', desc: 'Destroy asteroids faster.', prices: [100, 250, 500], effects: [1, 2, 3, 4] }, magnetRadius: { name: 'Magnet Radius', desc: 'Increases coin collection range.', prices: [75, 150, 300], effects: [150, 200, 250, 300] }, magnetDuration: { name: 'Magnet Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [300, 400, 500, 600] }, weaponDuration: { name: 'Weapon Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [300, 400, 500, 600] } };
-    
-    // --- Saved Data & State ---
-    let highScore, totalCoins, ownedSkins, equippedSkinId, customColors, upgradesState, username;
+// --- Game State Variables ---
+let canvasWidth, canvasHeight, player, stars, asteroids, particles, coins, powerUps, bullets, keys = {}, score = 0, coinsCollected = 0;
+let gameOver = true, gameSpeed, asteroidSpawnRate, frameCount = 0;
 
-    function loadData() {
-        highScore = localStorage.getItem('cosmicCourierHighScore') || 0;
-        totalCoins = parseInt(localStorage.getItem('cosmicCourierTotalCoins') || '0');
-        ownedSkins = JSON.parse(localStorage.getItem('cosmicCourierOwnedSkins') || '["default"]');
-        equippedSkinId = localStorage.getItem('cosmicCourierEquippedSkin') || 'default';
-        customColors = JSON.parse(localStorage.getItem('cosmicCourierCustomColors') || '{"shipColor": "#ffffff", "shieldColor": "rgba(255, 255, 255, 0.3)"}');
-        username = localStorage.getItem('cosmicCourierUsername') || '';
-        usernameInput.value = username;
-        
-        upgradesState = {};
-        Object.keys(UPGRADES_DATA).forEach(type => {
-            const maxLevel = parseInt(localStorage.getItem(`cc_max_level_${type}`) || '0');
-            let equippedLevel = parseInt(localStorage.getItem(`cc_equipped_level_${type}`) || maxLevel);
-            if (equippedLevel > maxLevel) equippedLevel = maxLevel;
-            upgradesState[type] = { maxLevel, equippedLevel };
-        });
-    }
-    
-    function saveData() {
-        localStorage.setItem('cosmicCourierHighScore', highScore);
-        localStorage.setItem('cosmicCourierTotalCoins', totalCoins);
-        localStorage.setItem('cosmicCourierOwnedSkins', JSON.stringify(ownedSkins));
-        localStorage.setItem('cosmicCourierEquippedSkin', equippedSkinId);
-        localStorage.setItem('cosmicCourierCustomColors', JSON.stringify(customColors));
-        localStorage.setItem('cosmicCourierUsername', username);
-        Object.keys(upgradesState).forEach(type => {
-            localStorage.setItem(`cc_max_level_${type}`, upgradesState[type].maxLevel);
-            localStorage.setItem(`cc_equipped_level_${type}`, upgradesState[type].equippedLevel);
-        });
-    }
+// Multiplayer State
+let peer, conn, myPeerId, isHost = false, isMultiplayer = false, players = {};
 
-    function resetProgress() {
-        if (confirm('Are you sure you want to reset all progress? This includes coins, upgrades, and skins. This cannot be undone.')) {
-            localStorage.removeItem('cosmicCourierTotalCoins'); localStorage.removeItem('cosmicCourierOwnedSkins'); localStorage.removeItem('cosmicCourierEquippedSkin'); localStorage.removeItem('cosmicCourierCustomColors');
-            Object.keys(UPGRADES_DATA).forEach(type => { localStorage.removeItem(`cc_max_level_${type}`); localStorage.removeItem(`cc_equipped_level_${type}`); });
-            loadData(); alert('All progress has been reset.');
-        }
-    }
-    
-    function isMobileDevice() { return ('ontouchstart' in window); }
-    function setCanvasDimensions() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; canvasWidth = canvas.width; canvasHeight = canvas.height; }
+// --- Static Game Data ---
+const SKINS_DATA = [
+{ id: 'default', name: 'Default', price: 0, desc: "The classic courier.", shipColor: '#0ff', shieldColor: 'rgba(0, 255, 255, 0.2)', shieldStroke: '#00ffff' },
+{ id: 'ember', name: 'Ember', price: 50, desc: "A fiery variant.", shipColor: '#ff4500', shieldColor: 'rgba(255, 69, 0, 0.3)', shieldStroke: '#ff4500' },
+{ id: 'rogue', name: 'Rogue', price: 75, desc: "Sleek and dangerous.", shipColor: '#f44336', shieldColor: 'rgba(244, 67, 54, 0.3)', shieldStroke: '#f44336' },
+{ id: 'venom', name: 'Venom', price: 100, desc: "A toxic choice.", shipColor: '#7cfc00', shieldColor: 'rgba(124, 252, 0, 0.3)', shieldStroke: '#7cfc00' },
+{ id: 'nebula', name: 'Nebula', price: 150, desc: "Forged in the cosmos.", shipColor: '#9400d3', shieldColor: 'rgba(148, 0, 211, 0.3)', shieldStroke: '#9400d3' },
+{ id: 'custom', name: 'Custom Color', price: 250, desc: "Your own style. Shield color sets hue, game sets transparency.", isCustom: true }
+];
 
-    /**
-     * FIX: Centralized function to manage UI panels. Hides all panels, then shows the one specified.
-     * This prevents multiple panels from being active and blocking clicks.
-     * @param {string} panelId The ID of the panel to show. If null, all panels are hidden.
-     */
-    function showPanel(panelId) {
-        allPanels.forEach(panel => {
-            panel.style.display = 'none';
-        });
-        if (panelId) {
-            const panelToShow = document.getElementById(panelId);
-            if (panelToShow) {
-                panelToShow.style.display = 'flex';
-            }
-        }
-    }
+const UPGRADES_DATA = {
+fireRate: { name: 'Fire Rate', desc: 'Increases bullet frequency.', prices: [50, 100, 200, 400], effects: [30, 25, 20, 15, 10] },
+damage: { name: 'Bullet Damage', desc: 'Destroy asteroids faster.', prices: [100, 250, 500], effects: [1, 2, 3, 4] },
+magnetRadius: { name: 'Magnet Radius', desc: 'Increases coin collection range.', prices: [75, 150, 300], effects: [150, 200, 250, 300] },
+magnetDuration: { name: 'Magnet Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [300, 400, 500, 600] },
+weaponDuration: { name: 'Weapon Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [300, 400, 500, 600] }
+};
 
-    class Player { 
-        constructor() { this.width = 40; this.height = 50; this.x = canvasWidth / 2 - this.width / 2; this.y = canvasHeight - this.height - (isMobileDevice() ? 150 : 30); this.speed = 8; this.shieldActive = false; this.magnetActive = false; this.magnetTimer = 0; this.weaponActive = false; this.weaponTimer = 0; this.lastShotTime = 0; this.initUpgrades(); this.setSkin(); }
-        initUpgrades() { this.fireRate = UPGRADES_DATA.fireRate.effects[upgradesState.fireRate.equippedLevel]; this.damage = UPGRADES_DATA.damage.effects[upgradesState.damage.equippedLevel]; this.magnetRadius = UPGRADES_DATA.magnetRadius.effects[upgradesState.magnetRadius.equippedLevel]; this.magnetDuration = UPGRADES_DATA.magnetDuration.effects[upgradesState.magnetDuration.equippedLevel]; this.weaponDuration = UPGRADES_DATA.weaponDuration.effects[upgradesState.weaponDuration.equippedLevel]; }
-        setSkin() { if (equippedSkinId === 'custom' && ownedSkins.includes('custom')) { this.color = customColors.shipColor; this.shieldDisplayColor = customColors.shieldColor; this.shieldStrokeColor = customColors.shipColor; } else { const skin = SKINS_DATA.find(s => s.id === equippedSkinId) || SKINS_DATA[0]; this.color = skin.shipColor; this.shieldDisplayColor = skin.shieldColor; this.shieldStrokeColor = skin.shieldStroke; } }
-        shoot() { if (this.weaponActive && frameCount - this.lastShotTime >= this.fireRate) { bullets.push(new Bullet(this.x + this.width / 2, this.y, this.damage, this.color)); this.lastShotTime = frameCount; } }
-        draw() { if (!gameOver) particles.push(new Particle(this.x + this.width / 2, this.y + this.height + 5, 2, 'rgba(255, 165, 0, 0.8)', {x: 0, y: 2})); if (this.magnetActive) { const pulse = Math.abs(Math.sin(frameCount * 0.1)) * 10; ctx.strokeStyle = `rgba(255, 0, 255, ${0.2 + (pulse / 20)})`; ctx.fillStyle = `rgba(255, 0, 255, ${0.05 + (pulse / 50)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.magnetRadius + pulse, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); } if (this.shieldActive) { ctx.fillStyle = this.shieldDisplayColor; ctx.strokeStyle = this.shieldStrokeColor; ctx.shadowColor = this.shieldStrokeColor; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.moveTo(this.x + this.width / 2, this.y); ctx.lineTo(this.x, this.y + this.height); ctx.lineTo(this.x + this.width, this.y + this.height); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; if (this.weaponActive) { const barWidth = (this.weaponTimer / this.weaponDuration) * this.width; ctx.fillStyle = '#FF6347'; ctx.fillRect(this.x, this.y + this.height + 5, barWidth, 5); } }
-        update() { if (keys['ArrowLeft'] && this.x > 0) this.x -= this.speed; if (keys['ArrowRight'] && this.x < canvasWidth - this.width) this.x += this.speed; this.shoot(); this.draw(); }
-    }
-    class Bullet { constructor(x, y, damage, color) { this.x = x - 2.5; this.y = y; this.width = 5; this.height = 15; this.speed = 10; this.damage = damage; this.color = color; } update() { this.y -= this.speed; } draw() { ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 10; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; } }
-    class Asteroid { constructor() { this.radius = Math.random() * 20 + 15; this.x = Math.random() * (canvasWidth - this.radius * 2) + this.radius; this.y = -this.radius; this.speed = Math.random() * 1 + gameSpeed; this.color = '#c5c5c5'; this.rotation = Math.random() * Math.PI * 2; this.rotationSpeed = (Math.random() - 0.5) * 0.04; this.health = Math.max(1, Math.floor(this.radius / 8)); } takeDamage(amount) { this.health -= amount; } draw() { ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation); ctx.fillStyle = this.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.shadowColor = this.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.moveTo(0 - this.radius, 0); for (let i = 1; i < 8; i++) { const angle = (i / 8) * Math.PI * 2; const dist = this.radius * (Math.random() * 0.4 + 0.8); ctx.lineTo(Math.cos(angle) * dist, Math.sin(angle) * dist); } ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); ctx.shadowBlur = 0; } update() { this.y += this.speed; this.rotation += this.rotationSpeed; this.draw(); } }
-    class Star { constructor() { this.x = Math.random() * canvasWidth; this.y = Math.random() * canvasHeight; this.radius = Math.random() * 1.5; this.speed = Math.random() * 0.5 + 0.2; this.color = 'rgba(255, 255, 255, 0.8)';} draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();} update() { this.y += this.speed * gameSpeed / 2; if (this.y > canvasHeight) { this.y = 0; this.x = Math.random() * canvasWidth;} this.draw();} }
-    class Particle { constructor(x, y, radius, color, velocity) { this.x = x; this.y = y; this.radius = Math.random() * radius + 1; this.color = color; this.velocity = velocity || { x: (Math.random() - 0.5) * 4, y: (Math.random() - 0.5) * 4 }; this.alpha = 1; this.friction = 0.98; } draw() { ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore(); } update() { this.velocity.x *= this.friction; this.velocity.y *= this.friction; this.x += this.velocity.x; this.y += this.velocity.y; this.alpha -= 0.02; this.draw(); } }
-    class Collectible { constructor(color) { this.radius = 12; this.x = Math.random() * (canvasWidth - this.radius * 2) + this.radius; this.y = -this.radius; this.speed = gameSpeed + 0.5; this.color = color; } draw(symbol) { ctx.fillStyle = this.color; ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.shadowColor = this.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (symbol) { ctx.fillStyle = 'white'; ctx.font = 'bold 14px Courier New'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, this.x, this.y + 1); } ctx.shadowBlur = 0; } update() { this.y += this.speed; } }
-    class Coin extends Collectible { constructor(x, y) { super('#FFD700'); if (x) this.x=x; if(y)this.y=y; } draw() { super.draw('$'); if(!isMultiplayer){this.update();} } }
-    class ShieldPowerUp extends Collectible { constructor() { super('#39FF14'); } draw() { super.draw('S'); if(!isMultiplayer){this.update();} } }
-    class MagnetPowerUp extends Collectible { constructor() { super('#FF00FF'); } draw() { super.draw('M'); if(!isMultiplayer){this.update();} } }
-    class WeaponPowerUp extends Collectible { constructor() { super('#FF6347'); } draw() { super.draw('W'); if(!isMultiplayer){this.update();} } }
+// --- Saved Data & State ---
+let highScore, totalCoins, ownedSkins, equippedSkinId, customColors, upgradesState;
 
-    function startSinglePlayerGame() {
-        isMultiplayer = false; setCanvasDimensions(); player = new Player(); stars = []; for (let i = 0; i < 150; i++) stars.push(new Star());
-        asteroids = []; coins = []; powerUps = []; particles = []; bullets = [];
-        score = 0; coinsCollected = 0; frameCount = 0; gameOver = false; gameSpeed = 2.0; asteroidSpawnRate = 120;
-        
-        showPanel(null);
-        gameStatsContainer.style.display = 'flex'; 
-        updateStatsDisplay(); 
-        if (isMobileDevice()) mobileControls.style.display = 'flex'; 
-        
-        gameLoop();
-    }
-    
-    function multiPlayerGameLoop() {
-        if (gameOver) return; requestAnimationFrame(multiPlayerGameLoop);
-        ctx.fillStyle = 'rgba(0, 5, 15, 0.2)'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-        stars.forEach(star => star.update());
+function robustJSONParse(jsonString, defaultValue) {
+if (typeof jsonString !== 'string') {
+return defaultValue;
+}
+try {
+const result = JSON.parse(jsonString);
+return result === null ? defaultValue : result;
+} catch (e) {
+console.warn("Could not parse JSON from localStorage, using default value.", e);
+return defaultValue;
+}
+}
 
-        asteroids.forEach(a => { const asteroid = new Asteroid(); Object.assign(asteroid, a); asteroid.draw(); });
-        coins.forEach(c => { const coin = new Coin(); Object.assign(coin, c); coin.draw('$'); });
-        particles.forEach((p, i) => { if (p.alpha <= 0.02) particles.splice(i, 1); else p.update(); });
-        
-        for (const id in players) {
-            const p = players[id]; ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 20; ctx.beginPath();
-            ctx.moveTo(p.x + p.width / 2, p.y); ctx.lineTo(p.x, p.y + p.height); ctx.lineTo(p.x + p.width, p.y + p.height);
-            ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
-            ctx.fillStyle = '#fff'; ctx.font = '14px Courier New'; ctx.textAlign = 'center';
-            ctx.fillText(p.name, p.x + p.width / 2, p.y + p.height + 15);
-        }
+function loadData() {
+// FIX: Ensure highScore is always parsed as a number, defaulting to 0.
+highScore = parseInt(localStorage.getItem('cosmicCourierHighScore'), 10) || 0;
 
-        if (isHost) {
-            frameCount++; const hostPlayer = players[myPeerId];
-            if (keys['ArrowLeft'] && hostPlayer.x > 0) hostPlayer.x -= hostPlayer.speed;
-            if (keys['ArrowRight'] && hostPlayer.x < canvasWidth - hostPlayer.width) hostPlayer.x += hostPlayer.speed;
+totalCoins = parseInt(localStorage.getItem('cosmicCourierTotalCoins'), 10) || 0;
 
-            if (frameCount % Math.floor(asteroidSpawnRate) === 0) asteroids.push(new Asteroid());
-            if (frameCount % 200 === 0) coins.push(new Coin());
-            
-            asteroids.forEach((asteroid, aIndex) => {
-                asteroid.y += asteroid.speed;
-                for (const id in players) {
-                    const p = players[id];
-                    const dist = Math.hypot(p.x + p.width / 2 - asteroid.x, p.y + p.height / 2 - asteroid.y);
-                    if (dist < asteroid.radius + p.width / 2) { endGame(id); return; }
-                }
-                if (asteroid.y > canvasHeight + asteroid.radius) asteroids.splice(aIndex, 1);
-            });
+ownedSkins = robustJSONParse(localStorage.getItem('cosmicCourierOwnedSkins'), ['default']);
+equippedSkinId = localStorage.getItem('cosmicCourierEquippedSkin') || 'default';
+customColors = robustJSONParse(localStorage.getItem('cosmicCourierCustomColors'), {"shipColor": "#ffffff", "shieldColor": "rgba(255, 255, 255, 0.3)"});
 
-            coins.forEach((coin, cIndex) => {
-                coin.y += coin.speed;
-                for (const id in players) {
-                    const p = players[id];
-                    const pRect = { x: p.x, y: p.y, width: p.width, height: p.height };
-                    if (checkCollision(pRect, coin)) { p.coins++; p.score += 100; createExplosion(coin.x, coin.y, coin.color, 10); coins.splice(cIndex, 1); break; }
-                }
-                if (coin.y > canvasHeight + coin.radius) coins.splice(cIndex, 1);
-            });
-            
-            hostPlayer.score++; gameSpeed += 0.001; if (asteroidSpawnRate > 40) asteroidSpawnRate -= 0.02;
-            const gameState = { type: 'gameState', asteroids, coins, players };
-            if (conn && conn.open) conn.send(gameState);
-        } else {
-            if (conn && conn.open) { if (keys['ArrowLeft']) conn.send({ type: 'input', key: 'ArrowLeft' }); if (keys['ArrowRight']) conn.send({ type: 'input', key: 'ArrowRight' }); }
-        }
-        updateStatsDisplay();
-    }
+upgradesState = {};
+Object.keys(UPGRADES_DATA).forEach(type => {
+const maxLevel = parseInt(localStorage.getItem(`cc_max_level_${type}`), 10) || 0;
 
-    function gameLoop() { if (gameOver) return; requestAnimationFrame(gameLoop); ctx.fillStyle = 'rgba(0, 5, 15, 0.2)'; ctx.fillRect(0, 0, canvasWidth, canvasHeight); stars.forEach(star => star.update()); player.update(); frameCount++; if (frameCount % Math.floor(asteroidSpawnRate) === 0) asteroids.push(new Asteroid()); if (frameCount % 200 === 0) coins.push(new Coin()); if (frameCount % 800 === 0) powerUps.push(new ShieldPowerUp()); if (frameCount % 1200 === 0) powerUps.push(new MagnetPowerUp()); if (frameCount % 1000 === 0) powerUps.push(new WeaponPowerUp()); if (player.magnetActive) { player.magnetTimer--; if (player.magnetTimer <= 0) player.magnetActive = false; } if (player.weaponActive) { player.weaponTimer--; if (player.weaponTimer <= 0) player.weaponActive = false; } bullets.forEach((bullet, bIndex) => { bullet.update(); bullet.draw(); asteroids.forEach((asteroid, aIndex) => { if (bullet.x < asteroid.x + asteroid.radius && bullet.x + bullet.width > asteroid.x - asteroid.radius && bullet.y < asteroid.y + asteroid.radius && bullet.y + bullet.height > asteroid.y - asteroid.radius) { asteroid.takeDamage(bullet.damage); createExplosion(bullet.x, bullet.y, 'rgba(255, 255, 100, 0.8)', 3); bullets.splice(bIndex, 1); if (asteroid.health <= 0) { createExplosion(asteroid.x, asteroid.y, asteroid.color, 15); score += 50; const numCoins = Math.floor(Math.random() * 3) + 1; for(let i = 0; i < numCoins; i++) { coins.push(new Coin(asteroid.x + (Math.random() - 0.5) * 20, asteroid.y + (Math.random() - 0.5) * 20)); } asteroids.splice(aIndex, 1); } } }); if (bullet.y < 0) bullets.splice(bIndex, 1); }); asteroids.forEach((asteroid, index) => { asteroid.update(); const dist = Math.hypot(player.x + player.width / 2 - asteroid.x, player.y + player.height / 2 - asteroid.y); if (dist < asteroid.radius + player.width / 2) { if (player.shieldActive) { player.shieldActive = false; createExplosion(asteroid.x, asteroid.y, asteroid.color, 15); asteroids.splice(index, 1); } else { createExplosion(player.x + player.width / 2, player.y + player.height / 2, '#f44336', 30); endGame(); } } if (asteroid.y > canvasHeight + asteroid.radius) asteroids.splice(index, 1); }); coins.forEach((coin, index) => { if (player.magnetActive) { const dist = Math.hypot(player.x + player.width / 2 - coin.x, player.y + player.height / 2 - coin.y); if (dist < player.magnetRadius) { coin.x += (player.x + player.width/2 - coin.x) * 0.1; coin.y += (player.y + player.height/2 - coin.y) * 0.1; } } coin.draw(); if (checkCollision(player, coin)) { coinsCollected++; totalCoins++; createExplosion(coin.x, coin.y, coin.color, 10); coins.splice(index, 1); } else if (coin.y > canvasHeight + coin.radius) coins.splice(index, 1); }); powerUps.forEach((powerUp, index) => { powerUp.draw(); if (checkCollision(player, powerUp)) { if (powerUp instanceof ShieldPowerUp) player.shieldActive = true; else if (powerUp instanceof MagnetPowerUp) { player.magnetActive = true; player.magnetTimer = player.magnetDuration; } else if (powerUp instanceof WeaponPowerUp) { player.weaponActive = true; player.weaponTimer = player.weaponDuration; } createExplosion(powerUp.x, powerUp.y, powerUp.color, 20); powerUps.splice(index, 1); } else if (powerUp.y > canvasHeight + powerUp.radius) powerUps.splice(index, 1); }); particles.forEach((particle, index) => { if (particle.alpha <= 0.02) particles.splice(index, 1); else particle.update(); }); score++; gameSpeed += 0.0015; if (asteroidSpawnRate > 30) asteroidSpawnRate -= 0.03; updateStatsDisplay(); }
-    
-    function createExplosion(x,y,c,n) { for (let i=0;i<n;i++) particles.push(new Particle(x,y,3,c));}
-    function checkCollision(p,c){const cX=Math.max(p.x,Math.min(c.x,p.x+p.width));const cY=Math.max(p.y,Math.min(c.y,p.y+p.height));return Math.hypot(c.x-cX,c.y-cY)<c.radius;}
-    
-    function endGame(loserId = null) {
-        if (gameOver) return; gameOver = true; keys = {};
-        if(isMultiplayer) {
-            gameEndedProperly = !!loserId;
-            if(conn && conn.open && isHost) { conn.send({ type: 'gameOver', loser: loserId }); }
-            
-            if (loserId) { gameOverTitle.textContent = loserId === myPeerId ? "You Lost!" : "You Won!"; } 
-            else { gameOverTitle.textContent = "Player Disconnected"; }
-            
-            const myFinalStats = players[myPeerId] || { coins: 0, score: 0 };
-            gameOverMessage.innerHTML = `You collected ${myFinalStats.coins}<span class="coin-icon"></span>. Your Score: ${myFinalStats.score}`;
-            
-            restartButton.style.display = 'none';
-            rematchButton.style.display = 'inline-block';
-            rematchButton.disabled = false;
-            rematchButton.textContent = "Offer Rematch";
-        } else {
-            if (score > highScore) highScore = score;
-            saveData();
-            restartButton.style.display = 'inline-block';
-            rematchButton.style.display = 'none';
-            gameOverTitle.textContent = "Game Over";
-            gameOverMessage.innerHTML = `You collected <span id="run-coins">${coinsCollected}</span><span class="coin-icon"></span> this run.`;
-        }
-        updateStatsDisplay(); if (isMobileDevice()) mobileControls.style.display = 'none';
-        showPanel('gameOverScreen');
-    }
+let equippedLevel = parseInt(localStorage.getItem(`cc_equipped_level_${type}`), 10);
+if (isNaN(equippedLevel)) {
+equippedLevel = maxLevel;
+}
 
-    function updateStatsDisplay() { 
-        const scoreEl = document.getElementById('score');
-        const highScoreEl = document.getElementById('high-score');
-        const coinScoreEl = document.getElementById('coin-score');
-        const totalCoinsStatEl = document.getElementById('total-coins-stat');
-        if (isMultiplayer) { 
-            if(players[myPeerId]) { 
-                const myStats = players[myPeerId]; 
-                scoreEl.textContent = 'Score: ' + myStats.score; 
-                coinScoreEl.innerHTML = `<span class="coin-icon"></span>${myStats.coins}`; 
-            } 
-            highScoreEl.style.display = 'none'; 
-            totalCoinsStatEl.style.display = 'none'; 
-        } else { 
-            scoreEl.textContent = 'Score: ' + score; 
-            highScoreEl.textContent = 'High Score: ' + highScore; 
-            coinScoreEl.innerHTML = `<span class="coin-icon"></span>${coinsCollected}`; 
-            totalCoinsStatEl.innerHTML = `Total Coins: ${totalCoins}<span class="coin-icon"></span>`; 
-            highScoreEl.style.display = 'inline'; 
-            totalCoinsStatEl.style.display = 'inline'; 
-        } 
-    }
-    
-    function populateShop() { 
-        loadData(); 
-        if (totalCoinsDisplayP) { totalCoinsDisplayP.innerHTML = `Total Coins: <span>${totalCoins}</span><span class="coin-icon"></span>`; } 
-        upgradesContainer.innerHTML = ''; skinsContainer.innerHTML = ''; 
-        Object.keys(UPGRADES_DATA).forEach(type => { const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const isMaxed = state.maxLevel >= data.prices.length; const price = isMaxed ? 'N/A' : data.prices[state.maxLevel]; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isMaxed) { actionsHTML = `<button class="button" disabled>Maxed Out</button>`; } else { actionsHTML = `<button class="button" onclick="buyUpgrade('${type}')" ${totalCoins < price ? 'disabled' : ''}>Upgrade</button>`; } item.innerHTML = ` <div class="shop-details"> <div class="shop-info"> <div class="shop-name-wrapper"> <span class="shop-name">${data.name}</span> <div class="level-controls"> <span class="level-arrow ${state.equippedLevel <= 0 ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel-1})"><</span> <span class="level-text">Lvl ${state.equippedLevel+1} / ${state.maxLevel+1}</span> <span class="level-arrow ${state.equippedLevel >= state.maxLevel ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel+1})">></span> </div> </div> <div class="shop-desc">${data.desc}</div> <div class="shop-price">Next Level: ${price} <span class="coin-icon"></span></div> </div> </div><div class="shop-actions">${actionsHTML}</div>`; upgradesContainer.appendChild(item); }); 
-        SKINS_DATA.forEach(skin => { const isOwned = ownedSkins.includes(skin.id); const isEquipped = equippedSkinId === skin.id; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isOwned) { actionsHTML = `<button class="button" ${isEquipped ? 'disabled' : ''} onclick="equipSkin('${skin.id}')">${isEquipped ? 'Equipped' : 'Equip'}</button>`; } else { actionsHTML = `<button class="button" onclick="buySkin('${skin.id}')" ${totalCoins < skin.price ? 'disabled' : ''}>Buy</button>`; } let customControls = ''; if (skin.isCustom && isOwned) { customControls = ` <input type="color" class="custom-color-picker" value="${customColors.shipColor}" oninput="handleCustomColorChange('shipColor', this.value)"> <input type="color" class="custom-color-picker" value="${customColors.shieldColor.startsWith('#') ? customColors.shieldColor.substring(0, 7) : '#ffffff'}" oninput="handleCustomColorChange('shieldColor', this.value + '4D')"> `; } item.innerHTML = ` <div class="shop-details"> <div class="shop-preview" style="background-color: ${skin.isCustom ? customColors.shipColor : skin.shipColor};"></div> <div class="shop-info"> <div class="shop-name-wrapper"><span class="shop-name">${skin.name}</span><span>${customControls}</span></div> <div class="shop-desc">${skin.desc}</div> <div class="shop-price">${isOwned ? 'Owned' : `${skin.price} <span class="coin-icon"></span>`}</div> </div> </div><div class="shop-actions">${actionsHTML}</div>`; skinsContainer.appendChild(item); }); 
-    }
-    
-    function buyUpgrade(type) { const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const price = data.prices[state.maxLevel]; if (totalCoins >= price) { totalCoins -= price; state.maxLevel++; state.equippedLevel = state.maxLevel; saveData(); populateShop(); } }
-    function setEquippedLevel(type, newLevel) { const state = upgradesState[type]; if (newLevel >= 0 && newLevel <= state.maxLevel) { state.equippedLevel = newLevel; saveData(); populateShop(); } }
-    function buySkin(skinId) { const skin = SKINS_DATA.find(s => s.id === skinId); if (!skin || skin.price > totalCoins) return; totalCoins -= skin.price; ownedSkins.push(skinId); equipSkin(skinId); }
-    function equipSkin(skinId) { if (ownedSkins.includes(skinId)) { equippedSkinId = skinId; saveData(); populateShop(); } }
-    function handleCustomColorChange(type, color) { customColors[type] = color; if (equippedSkinId === 'custom') { equipSkin('custom'); } else { saveData(); populateShop(); } }
+if (equippedLevel > maxLevel) {
+equippedLevel = maxLevel;
+}
 
-    // --- Multiplayer Logic ---
-    function initializePeer(id) {
-        if (peer) peer.destroy(); peer = new Peer(id);
-        peer.on('open', (id) => { myPeerId = id; if (isHost) { mpStatus.textContent = `Room Created! ID: ${id}`; roomIdInput.value = id; roomIdInput.disabled = true; createRoomButton.disabled = true; joinRoomButton.disabled = true; } });
-        peer.on('connection', (connection) => { conn = connection; setupConnectionEvents(); });
-        peer.on('error', (err) => { mpStatus.textContent = `Error: ${err.type}. Try another ID.`; resetMultiplayerUI(); });
-    }
-    function setupConnectionEvents() {
-        conn.on('open', () => {
-            if (isHost) { mpStatus.textContent = 'Player 2 connected! Waiting for info...'; } 
-            else { mpStatus.textContent = 'Connected! Sending info...'; }
-            conn.send({ type: 'userInfo', name: username });
-        });
-        conn.on('data', (data) => {
-            if (data.type === 'userInfo' && (!players[conn.peer] || !isHost)) {
-                if (isHost) {
-                    const pTemplate = new Player();
-                    players[myPeerId] = { ...pTemplate, name: username, score: 0, coins: 0 };
-                    players[conn.peer] = { ...pTemplate, name: data.name, score: 0, coins: 0, x: canvasWidth / 2 + 20, color: '#ff4500' };
-                    setTimeout(startMultiplayerGame, 1000);
-                } else { conn.send({ type: 'userInfo', name: username }); }
-            } else if (data.type === 'gameState') {
-                if (gameOver) startMultiplayerGame();
-                asteroids = data.asteroids; coins = data.coins; players = data.players;
-            } else if (data.type === 'input' && isHost && players[conn.peer]) {
-                const p = players[conn.peer];
-                if (data.key === 'ArrowLeft' && p.x > 0) p.x -= p.speed;
-                if (data.key === 'ArrowRight' && p.x < canvasWidth - p.width) p.x += p.speed;
-            } else if (data.type === 'gameOver') {
-                endGame(data.loser);
-            } else if (data.type === 'rematchRequest') {
-                rematchState.opponent = true;
-                rematchButton.textContent = "Opponent wants a rematch!";
-                checkForRematch();
-            } else if (data.type === 'startRematch') {
-                startMultiplayerGame();
-            }
-        });
-        conn.on('close', () => { if(!gameOver && !gameEndedProperly) { endGame(); } resetMultiplayerUI(); });
-    }
-    function startMultiplayerGame() {
-        if (isHost) {
-            const pTemplate = new Player();
-            const p1Name = players[myPeerId] ? players[myPeerId].name : username;
-            const p2Name = players[conn.peer] ? players[conn.peer].name : 'Opponent';
-            players = {}; 
-            players[myPeerId] = { ...pTemplate, x: canvasWidth / 2 - 60, name: p1Name, score: 0, coins: 0 };
-            players[conn.peer] = { ...pTemplate, x: canvasWidth / 2 + 20, name: p2Name, score: 0, coins: 0, color: '#ff4500' };
-        }
-        
-        isMultiplayer = true; setCanvasDimensions();
-        if(!player) player = new Player();
-        stars = []; for (let i = 0; i < 150; i++) stars.push(new Star());
-        asteroids = []; coins = []; particles = []; frameCount = 0; gameOver = false; 
-        gameSpeed = 2.0; asteroidSpawnRate = 120; gameEndedProperly = false;
-        rematchState = { me: false, opponent: false };
+upgradesState[type] = { maxLevel, equippedLevel };
+});
+}
 
-        showPanel(null);
-        gameStatsContainer.style.display = 'flex'; if (isMobileDevice()) mobileControls.style.display = 'flex';
-        
-        if (isHost && conn && conn.open) conn.send({ type: 'startRematch' });
-        multiPlayerGameLoop();
-    }
-    function resetMultiplayerUI() {
-        if(peer && !isHost) peer.destroy();
-        conn = null;
-        rematchState = { me: false, opponent: false };
-        roomIdInput.value = ''; roomIdInput.disabled = false; createRoomButton.disabled = false; joinRoomButton.disabled = false;
-        mpStatus.textContent = "Create a room or join a friend's.";
-    }
-    function offerRematch() {
-        rematchState.me = true;
-        rematchButton.disabled = true;
-        rematchButton.textContent = "Waiting for opponent...";
-        if(conn && conn.open) conn.send({ type: 'rematchRequest' });
-        checkForRematch();
-    }
-    function checkForRematch() {
-        if (rematchState.me && rematchState.opponent) {
-            rematchButton.textContent = "Starting...";
-            if (isHost) { setTimeout(startMultiplayerGame, 1000); }
-        }
-    }
+function saveData() {
+localStorage.setItem('cosmicCourierHighScore', highScore);
+localStorage.setItem('cosmicCourierTotalCoins', totalCoins);
+localStorage.setItem('cosmicCourierOwnedSkins', JSON.stringify(ownedSkins));
+localStorage.setItem('cosmicCourierEquippedSkin', equippedSkinId);
+localStorage.setItem('cosmicCourierCustomColors', JSON.stringify(customColors));
+Object.keys(upgradesState).forEach(type => {
+localStorage.setItem(`cc_max_level_${type}`, upgradesState[type].maxLevel);
+localStorage.setItem(`cc_equipped_level_${type}`, upgradesState[type].equippedLevel);
+});
+}
 
-    // --- EVENT LISTENERS ---
-    window.addEventListener('keydown', e => keys[e.key] = true); 
-    window.addEventListener('keyup', e => keys[e.key] = false);
-    
-    // Game Start buttons
-    startButton.addEventListener('click', startSinglePlayerGame); 
-    restartButton.addEventListener('click', startSinglePlayerGame);
-    rematchButton.addEventListener('click', offerRematch);
+function resetProgress() {
+if (confirm('Are you sure you want to reset all progress? This includes coins, upgrades, and skins. This cannot be undone.')) {
+localStorage.removeItem('cosmicCourierTotalCoins');
+localStorage.removeItem('cosmicCourierOwnedSkins');
+localStorage.removeItem('cosmicCourierEquippedSkin');
+localStorage.removeItem('cosmicCourierCustomColors');
+Object.keys(UPGRADES_DATA).forEach(type => {
+localStorage.removeItem(`cc_max_level_${type}`);
+localStorage.removeItem(`cc_equipped_level_${type}`);
+});
+loadData();
+populateShop(); // Refresh shop view
+alert('All progress has been reset.');
+}
+}
 
-    // Main menu navigation
-    multiplayerButton.addEventListener('click', () => showPanel('usernameScreen'));
-    shopButton.addEventListener('click', () => { showPanel('shopScreen'); populateShop(); });
-    settingsButton.addEventListener('click', () => showPanel('settingsScreen'));
-    howToPlayButton.addEventListener('click', () => showPanel('howToPlayScreen'));
+function isMobileDevice() { return ('ontouchstart' in window); }
+function setCanvasDimensions() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; canvasWidth = canvas.width; canvasHeight = canvas.height; }
 
-    // Sub-menu navigation
-    usernameBackToMenuButton.addEventListener('click', () => showPanel('startScreen'));
-    closeHowToPlayButton.addEventListener('click', () => showPanel('startScreen'));
-    closeSettingsButton.addEventListener('click', () => showPanel('startScreen'));
-    closeShopButton.addEventListener('click', () => showPanel('startScreen'));
-    backToMenuButton.addEventListener('click', () => { showPanel('startScreen'); resetMultiplayerUI(); });
-    
-    // Game Over navigation
-    goToMenuButton.addEventListener('click', () => { gameStatsContainer.style.display = 'none'; showPanel('startScreen'); resetMultiplayerUI(); gameOver = true; });
-    goToShopButton.addEventListener('click', () => { gameStatsContainer.style.display = 'none'; showPanel('shopScreen'); populateShop(); });
+class Player { 
+constructor() { this.width = 40; this.height = 50; this.x = canvasWidth / 2 - this.width / 2; this.y = canvasHeight - this.height - (isMobileDevice() ? 150 : 30); this.speed = 8; this.shieldActive = false; this.magnetActive = false; this.magnetTimer = 0; this.weaponActive = false; this.weaponTimer = 0; this.lastShotTime = 0; this.initUpgrades(); this.setSkin(); }
+initUpgrades() { this.fireRate = UPGRADES_DATA.fireRate.effects[upgradesState.fireRate.equippedLevel]; this.damage = UPGRADES_DATA.damage.effects[upgradesState.damage.equippedLevel]; this.magnetRadius = UPGRADES_DATA.magnetRadius.effects[upgradesState.magnetRadius.equippedLevel]; this.magnetDuration = UPGRADES_DATA.magnetDuration.effects[upgradesState.magnetDuration.equippedLevel]; this.weaponDuration = UPGRADES_DATA.weaponDuration.effects[upgradesState.weaponDuration.equippedLevel]; }
+setSkin() { if (equippedSkinId === 'custom' && ownedSkins.includes('custom')) { this.color = customColors.shipColor; this.shieldDisplayColor = customColors.shieldColor; this.shieldStrokeColor = customColors.shipColor; } else { const skin = SKINS_DATA.find(s => s.id === equippedSkinId) || SKINS_DATA[0]; this.color = skin.shipColor; this.shieldDisplayColor = skin.shieldColor; this.shieldStrokeColor = skin.shieldStroke; } }
+shoot() { if (this.weaponActive && frameCount - this.lastShotTime >= this.fireRate) { bullets.push(new Bullet(this.x + this.width / 2, this.y, this.damage, this.color)); this.lastShotTime = frameCount; } }
+draw() { if (!gameOver) particles.push(new Particle(this.x + this.width / 2, this.y + this.height + 5, 2, 'rgba(255, 165, 0, 0.8)', {x: 0, y: 2})); if (this.magnetActive) { const pulse = Math.abs(Math.sin(frameCount * 0.1)) * 10; ctx.strokeStyle = `rgba(255, 0, 255, ${0.2 + (pulse / 20)})`; ctx.fillStyle = `rgba(255, 0, 255, ${0.05 + (pulse / 50)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.magnetRadius + pulse, 0, Math.PI * 2); ctx.stroke(); ctx.fill(); } if (this.shieldActive) { ctx.fillStyle = this.shieldDisplayColor; ctx.strokeStyle = this.shieldStrokeColor; ctx.shadowColor = this.shieldStrokeColor; ctx.shadowBlur = 20; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); } ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 20; ctx.beginPath(); ctx.moveTo(this.x + this.width / 2, this.y); ctx.lineTo(this.x, this.y + this.height); ctx.lineTo(this.x + this.width, this.y + this.height); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; if (this.weaponActive) { const barWidth = (this.weaponTimer / this.weaponDuration) * this.width; ctx.fillStyle = '#FF6347'; ctx.fillRect(this.x, this.y + this.height + 5, barWidth, 5); } }
+update() { if (keys['ArrowLeft'] && this.x > 0) this.x -= this.speed; if (keys['ArrowRight'] && this.x < canvasWidth - this.width) this.x += this.speed; this.shoot(); this.draw(); }
+}
+class Bullet { constructor(x, y, damage, color) { this.x = x - 2.5; this.y = y; this.width = 5; this.height = 15; this.speed = 10; this.damage = damage; this.color = color; } update() { this.y -= this.speed; } draw() { ctx.fillStyle = this.color; ctx.shadowColor = this.color; ctx.shadowBlur = 10; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; } }
+class Asteroid { constructor() { this.radius = Math.random() * 20 + 15; this.x = Math.random() * (canvasWidth - this.radius * 2) + this.radius; this.y = -this.radius; this.speed = Math.random() * 1 + gameSpeed; this.color = '#c5c5c5'; this.rotation = Math.random() * Math.PI * 2; this.rotationSpeed = (Math.random() - 0.5) * 0.04; this.health = Math.max(1, Math.floor(this.radius / 8)); } takeDamage(amount) { this.health -= amount; } draw() { ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation); ctx.fillStyle = this.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.shadowColor = this.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.moveTo(0 - this.radius, 0); for (let i = 1; i < 8; i++) { const angle = (i / 8) * Math.PI * 2; const dist = this.radius * (Math.random() * 0.4 + 0.8); ctx.lineTo(Math.cos(angle) * dist, Math.sin(angle) * dist); } ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); ctx.shadowBlur = 0; } update() { this.y += this.speed; this.rotation += this.rotationSpeed; this.draw(); } }
+class Star { constructor() { this.x = Math.random() * canvasWidth; this.y = Math.random() * canvasHeight; this.radius = Math.random() * 1.5; this.speed = Math.random() * 0.5 + 0.2; this.color = 'rgba(255, 255, 255, 0.8)';} draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();} update() { this.y += this.speed * gameSpeed / 2; if (this.y > canvasHeight) { this.y = 0; this.x = Math.random() * canvasWidth;} this.draw();} }
+class Particle { constructor(x, y, radius, color, velocity) { this.x = x; this.y = y; this.radius = Math.random() * radius + 1; this.color = color; this.velocity = velocity || { x: (Math.random() - 0.5) * 4, y: (Math.random() - 0.5) * 4 }; this.alpha = 1; this.friction = 0.98; } draw() { ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore(); } update() { this.velocity.x *= this.friction; this.velocity.y *= this.friction; this.x += this.velocity.x; this.y += this.velocity.y; this.alpha -= 0.02; this.draw(); } }
+class Collectible { constructor(color) { this.radius = 12; this.x = Math.random() * (canvasWidth - this.radius * 2) + this.radius; this.y = -this.radius; this.speed = gameSpeed + 0.5; this.color = color; } draw(symbol) { ctx.fillStyle = this.color; ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.shadowColor = this.color; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); if (symbol) { ctx.fillStyle = 'white'; ctx.font = 'bold 14px Courier New'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, this.x, this.y + 1); } ctx.shadowBlur = 0; } update() { this.y += this.speed; } }
+class Coin extends Collectible { constructor(x, y) { super('#FFD700'); if (x) this.x=x; if(y)this.y=y; } draw() { super.draw('$'); if(!isMultiplayer){this.update();} } }
+class ShieldPowerUp extends Collectible { constructor() { super('#39FF14'); } draw() { super.draw('S'); if(!isMultiplayer){this.update();} } }
+class MagnetPowerUp extends Collectible { constructor() { super('#FF00FF'); } draw() { super.draw('M'); if(!isMultiplayer){this.update();} } }
+class WeaponPowerUp extends Collectible { constructor() { super('#FF6347'); } draw() { super.draw('W'); if(!isMultiplayer){this.update();} } }
 
-    // Multiplayer lobby actions
-    continueToLobbyButton.addEventListener('click', () => {
-        const name = usernameInput.value.trim();
-        username = name || 'Courier';
-        saveData();
-        showPanel('multiplayerScreen');
-        setCanvasDimensions();
-    });
-    createRoomButton.addEventListener('click', () => { isHost = true; let roomId = 'cosmic' + Math.floor(Math.random() * 9000 + 1000); initializePeer(roomId); });
-    joinRoomButton.addEventListener('click', () => {
-        isHost = false; const roomId = roomIdInput.value.trim();
-        if (!roomId) { mpStatus.textContent = 'Please enter a Room ID to join.'; return; }
-        initializePeer();
-        setTimeout(() => {
-            if (!peer || !peer.id) { mpStatus.textContent = 'Error getting Peer ID. Check connection.'; return; }
-            mpStatus.textContent = `Connecting to room: ${roomId}...`;
-            conn = peer.connect(roomId); 
-            setupConnectionEvents();
-        }, 1000);
-    });
+function init() { // Single player init
+isMultiplayer = false;
+setCanvasDimensions(); player = new Player(); stars = []; for (let i = 0; i < 150; i++) stars.push(new Star());
+asteroids = []; coins = []; powerUps = []; particles = []; bullets = [];
+score = 0; coinsCollected = 0; frameCount = 0; gameOver = false; gameSpeed = 2.0; asteroidSpawnRate = 120;
+startScreen.style.display = 'none'; gameOverScreen.style.display = 'none'; shopScreen.style.display = 'none'; settingsScreen.style.display = 'none'; howToPlayScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameStatsContainer.style.display = 'flex';
+updateStatsDisplay(); if (isMobileDevice()) mobileControls.style.display = 'flex'; 
+restartButton.textContent = "Try Again (Single Player)";
+gameLoop();
+}
 
-    // Settings actions
-    resetHighScoreButton.addEventListener('click', () => { if (confirm('Are you sure you want to reset your High Score? This cannot be undone.')) { highScore = 0; saveData(); alert('High Score reset!'); } });
-    resetProgressButton.addEventListener('click', resetProgress);
-    
-    // System events
-    if (isMobileDevice()) { leftBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowLeft'] = true; }, { passive: false }); leftBtn.addEventListener('touchend', () => keys['ArrowLeft'] = false); rightBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowRight'] = true; }, { passive: false }); rightBtn.addEventListener('touchend', () => keys['ArrowRight'] = false); }
-    window.addEventListener('resize', () => { setCanvasDimensions(); if (player && !gameOver) { player.y = canvasHeight - player.height - (isMobileDevice() ? 150 : 30); } });
+function multiPlayerGameLoop() {
+if (gameOver) return; requestAnimationFrame(multiPlayerGameLoop);
+ctx.fillStyle = 'rgba(0, 5, 15, 0.2)'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+stars.forEach(star => star.update());
 
-    // Initial setup on page load
-    loadData();
-    setCanvasDimensions();
-    gameStatsContainer.style.display = 'none';
-    showPanel('startScreen');
+asteroids.forEach(a => { const asteroid = new Asteroid(); Object.assign(asteroid, a); asteroid.draw(); });
+coins.forEach(c => { const coin = new Coin(); Object.assign(coin, c); coin.draw('$'); });
+particles.forEach((p, i) => { if (p.alpha <= 0.02) particles.splice(i, 1); else p.update(); });
+
+for (const id in players) {
+const p = players[id]; ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 20; ctx.beginPath();
+ctx.moveTo(p.x + player.width / 2, p.y); ctx.lineTo(p.x, p.y + player.height); ctx.lineTo(p.x + player.width, p.y + player.height);
+ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+}
+
+if (isHost) {
+frameCount++;
+const hostPlayer = players[myPeerId];
+if (keys['ArrowLeft'] && hostPlayer.x > 0) hostPlayer.x -= player.speed;
+if (keys['ArrowRight'] && hostPlayer.x < canvasWidth - player.width) hostPlayer.x += player.speed;
+
+if (frameCount % Math.floor(asteroidSpawnRate) === 0) asteroids.push(new Asteroid());
+if (frameCount % 200 === 0) coins.push(new Coin());
+
+asteroids.forEach((asteroid, aIndex) => {
+asteroid.y += asteroid.speed;
+for (const id in players) {
+const p = players[id];
+const dist = Math.hypot(p.x + player.width / 2 - asteroid.x, p.y + player.height / 2 - asteroid.y);
+if (dist < asteroid.radius + player.width / 2) { endGame(id); return; }
+}
+if (asteroid.y > canvasHeight + asteroid.radius) asteroids.splice(aIndex, 1);
+});
+
+coins.forEach((coin, cIndex) => {
+coin.y += coin.speed;
+for (const id in players) {
+const p = players[id];
+const pRect = { x: p.x, y: p.y, width: player.width, height: player.height };
+if (checkCollision(pRect, coin)) {
+p.coins++; p.score += 100;
+createExplosion(coin.x, coin.y, coin.color, 10);
+coins.splice(cIndex, 1); break;
+}
+}
+if (coin.y > canvasHeight + coin.radius) coins.splice(cIndex, 1);
+});
+
+hostPlayer.score++; gameSpeed += 0.001; if (asteroidSpawnRate > 40) asteroidSpawnRate -= 0.02;
+
+const gameState = { type: 'gameState', asteroids: asteroids.map(a => ({ x: a.x, y: a.y, radius: a.radius, rotation: a.rotation, color: a.color })), coins: coins.map(c => ({ x: c.x, y: c.y, radius: c.radius, color: c.color })), players: players };
+if (conn && conn.open) conn.send(gameState);
+} else {
+if (conn && conn.open) {
+if (keys['ArrowLeft']) conn.send({ type: 'input', key: 'ArrowLeft' });
+if (keys['ArrowRight']) conn.send({ type: 'input', key: 'ArrowRight' });
+}
+}
+updateStatsDisplay();
+}
+
+function gameLoop() { // Single player
+if (gameOver) return; requestAnimationFrame(gameLoop);
+ctx.fillStyle = 'rgba(0, 5, 15, 0.2)'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+stars.forEach(star => star.update()); player.update(); frameCount++;
+if (frameCount % Math.floor(asteroidSpawnRate) === 0) asteroids.push(new Asteroid());
+if (frameCount % 200 === 0) coins.push(new Coin());
+if (frameCount % 800 === 0) powerUps.push(new ShieldPowerUp());
+if (frameCount % 1200 === 0) powerUps.push(new MagnetPowerUp());
+if (frameCount % 1000 === 0) powerUps.push(new WeaponPowerUp());
+if (player.magnetActive) { player.magnetTimer--; if (player.magnetTimer <= 0) player.magnetActive = false; }
+if (player.weaponActive) { player.weaponTimer--; if (player.weaponTimer <= 0) player.weaponActive = false; }
+bullets.forEach((bullet, bIndex) => {
+bullet.update(); bullet.draw();
+asteroids.forEach((asteroid, aIndex) => {
+if (bullet.x < asteroid.x + asteroid.radius && bullet.x + bullet.width > asteroid.x - asteroid.radius && bullet.y < asteroid.y + asteroid.radius && bullet.y + bullet.height > asteroid.y - asteroid.radius) {
+asteroid.takeDamage(bullet.damage); createExplosion(bullet.x, bullet.y, 'rgba(255, 255, 100, 0.8)', 3); bullets.splice(bIndex, 1);
+if (asteroid.health <= 0) {
+createExplosion(asteroid.x, asteroid.y, asteroid.color, 15); score += 50;
+const numCoins = Math.floor(Math.random() * 3) + 1; for(let i = 0; i < numCoins; i++) { coins.push(new Coin(asteroid.x + (Math.random() - 0.5) * 20, asteroid.y + (Math.random() - 0.5) * 20)); }
+asteroids.splice(aIndex, 1);
+}
+}
+});
+if (bullet.y < 0) bullets.splice(bIndex, 1);
+});
+asteroids.forEach((asteroid, index) => {
+asteroid.update();
+const dist = Math.hypot(player.x + player.width / 2 - asteroid.x, player.y + player.height / 2 - asteroid.y);
+if (dist < asteroid.radius + player.width / 2) {
+if (player.shieldActive) { player.shieldActive = false; createExplosion(asteroid.x, asteroid.y, asteroid.color, 15); asteroids.splice(index, 1); } 
+else { createExplosion(player.x + player.width / 2, player.y + player.height / 2, '#f44336', 30); endGame(); }
+}
+if (asteroid.y > canvasHeight + asteroid.radius) asteroids.splice(index, 1);
+});
+coins.forEach((coin, index) => {
+if (player.magnetActive) {
+const dist = Math.hypot(player.x + player.width / 2 - coin.x, player.y + player.height / 2 - coin.y);
+if (dist < player.magnetRadius) { coin.x += (player.x + player.width/2 - coin.x) * 0.1; coin.y += (player.y + player.height/2 - coin.y) * 0.1; }
+}
+coin.draw(); 
+if (checkCollision(player, coin)) { coinsCollected++; totalCoins++; createExplosion(coin.x, coin.y, coin.color, 10); coins.splice(index, 1); } 
+else if (coin.y > canvasHeight + coin.radius) coins.splice(index, 1);
+});
+powerUps.forEach((powerUp, index) => { 
+powerUp.draw(); 
+if (checkCollision(player, powerUp)) { 
+if (powerUp instanceof ShieldPowerUp) player.shieldActive = true; 
+else if (powerUp instanceof MagnetPowerUp) { player.magnetActive = true; player.magnetTimer = player.magnetDuration; }
+else if (powerUp instanceof WeaponPowerUp) { player.weaponActive = true; player.weaponTimer = player.weaponDuration; }
+createExplosion(powerUp.x, powerUp.y, powerUp.color, 20); powerUps.splice(index, 1); 
+} else if (powerUp.y > canvasHeight + powerUp.radius) powerUps.splice(index, 1);
+});
+particles.forEach((particle, index) => { if (particle.alpha <= 0.02) particles.splice(index, 1); else particle.update(); });
+score++; gameSpeed += 0.0015; if (asteroidSpawnRate > 30) asteroidSpawnRate -= 0.03;
+updateStatsDisplay();
+}
+
+function createExplosion(x,y,c,n) { for (let i=0;i<n;i++) particles.push(new Particle(x,y,3,c));}
+function checkCollision(p,c){const cX=Math.max(p.x,Math.min(c.x,p.x+p.width));const cY=Math.max(p.y,Math.min(c.y,p.y+p.height));return Math.hypot(c.x-cX,c.y-cY)<c.radius;}
+
+function endGame(loserId = null) {
+if (gameOver) return; gameOver = true; keys = {};
+if(isMultiplayer) {
+if(conn && conn.open && isHost) { conn.send({ type: 'gameOver', loser: loserId }); setTimeout(() => conn.close(), 500); }
+if (loserId) { gameOverTitle.textContent = loserId === myPeerId ? "You Lost!" : "You Won!"; } 
+else { gameOverTitle.textContent = "Player Disconnected"; }
+const myFinalStats = players[myPeerId] || { coins: 0, score: 0 };
+gameOverMessage.innerHTML = `You collected ${myFinalStats.coins}<span class="coin-icon"></span>. Your Score: ${myFinalStats.score}`;
+restartButton.textContent = "Multiplayer Menu";
+restartButton.onclick = () => { gameOverScreen.style.display = 'none'; multiplayerScreen.style.display = 'flex'; resetMultiplayerUI(); };
+} else {
+if (score > highScore) {
+highScore = score;
+}
+saveData();
+restartButton.textContent = "Try Again (Single Player)"; restartButton.onclick = init;
+gameOverTitle.textContent = "Game Over";
+runCoinsEl.textContent = coinsCollected;
+}
+updateStatsDisplay(); if (isMobileDevice()) mobileControls.style.display = 'none';
+gameOverScreen.style.display = 'flex';
+}
+
+function updateStatsDisplay() {
+if (isMultiplayer) {
+if(players[myPeerId]) {
+const myStats = players[myPeerId]; scoreEl.textContent = 'Score: ' + myStats.score;
+coinScoreEl.innerHTML = `<span class="coin-icon"></span>${myStats.coins}`;
+}
+highScoreEl.style.display = 'none'; totalCoinsStatEl.style.display = 'none';
+} else {
+scoreEl.textContent = 'Score: ' + score;
+highScoreEl.textContent = 'High Score: ' + highScore;
+coinScoreEl.innerHTML = `<span class="coin-icon"></span>${coinsCollected}`;
+totalCoinsStatEl.innerHTML = `Total Coins: ${totalCoins}<span class="coin-icon"></span>`;
+highScoreEl.style.display = 'inline'; totalCoinsStatEl.style.display = 'inline';
+}
+}
+
+// --- SHOP LOGIC ---
+function buyUpgrade(type) {
+const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const price = data.prices[state.maxLevel];
+if (totalCoins >= price) {
+totalCoins -= price; state.maxLevel++; state.equippedLevel = state.maxLevel; saveData(); populateShop();
+}
+}
+function setEquippedLevel(type, newLevel) {
+const state = upgradesState[type]; if (newLevel >= 0 && newLevel <= state.maxLevel) {
+state.equippedLevel = newLevel; saveData(); populateShop();
+}
+}
+function buySkin(skinId) {
+const skin = SKINS_DATA.find(s => s.id === skinId); if (!skin || skin.price > totalCoins) return;
+totalCoins -= skin.price; ownedSkins.push(skinId); equipSkin(skinId);
+}
+function equipSkin(skinId) {
+if (ownedSkins.includes(skinId)) {
+equippedSkinId = skinId; saveData(); populateShop();
+}
+}
+function handleCustomColorChange(type, color) {
+customColors[type] = color; 
+if (equippedSkinId === 'custom') { equipSkin('custom'); } // This will save and repopulate
+else { saveData(); populateShop(); }
+}
+function populateShop() {
+if (totalCoinsDisplayP) {
+totalCoinsDisplayP.innerHTML = `Total Coins: <span>${totalCoins}</span><span class="coin-icon"></span>`;
+}
+
+upgradesContainer.innerHTML = ''; skinsContainer.innerHTML = '';
+Object.keys(UPGRADES_DATA).forEach(type => {
+const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const isMaxed = state.maxLevel >= data.prices.length;
+const price = isMaxed ? 'N/A' : data.prices[state.maxLevel];
+const item = document.createElement('div'); item.className = 'shop-item';
+let actionsHTML;
+if (isMaxed) { actionsHTML = `<button class="button" disabled>Maxed Out</button>`;
+} else { actionsHTML = `<button class="button" onclick="buyUpgrade('${type}')" ${totalCoins < price ? 'disabled' : ''}>Upgrade</button>`; }
+item.innerHTML = `
+<div class="shop-details">
+<div class="shop-info">
+<div class="shop-name-wrapper">
+<span class="shop-name">${data.name}</span>
+<div class="level-controls">
+<span class="level-arrow ${state.equippedLevel <= 0 ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel-1})"><</span>
+<span class="level-text">Lvl ${state.equippedLevel+1} / ${state.maxLevel+1}</span>
+<span class="level-arrow ${state.equippedLevel >= state.maxLevel ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel+1})">></span>
+</div>
+</div>
+<div class="shop-desc">${data.desc}</div>
+<div class="shop-price">Next Level: ${price} <span class="coin-icon"></span></div>
+</div>
+</div><div class="shop-actions">${actionsHTML}</div>`;
+upgradesContainer.appendChild(item);
+});
+SKINS_DATA.forEach(skin => {
+const isOwned = ownedSkins.includes(skin.id); const isEquipped = equippedSkinId === skin.id;
+const item = document.createElement('div'); item.className = 'shop-item';
+let actionsHTML;
+if (isOwned) { actionsHTML = `<button class="button" ${isEquipped ? 'disabled' : ''} onclick="equipSkin('${skin.id}')">${isEquipped ? 'Equipped' : 'Equip'}</button>`;
+} else { actionsHTML = `<button class="button" onclick="buySkin('${skin.id}')" ${totalCoins < skin.price ? 'disabled' : ''}>Buy</button>`; }
+
+let customControls = '';
+if (skin.isCustom && isOwned) {
+customControls = `
+<input type="color" class="custom-color-picker" value="${customColors.shipColor}" oninput="handleCustomColorChange('shipColor', this.value)">
+<input type="color" class="custom-color-picker" value="${customColors.shieldColor.startsWith('#') ? customColors.shieldColor.substring(0, 7) : '#ffffff'}" oninput="handleCustomColorChange('shieldColor', this.value + '4D')">
+`;
+}
+item.innerHTML = `
+<div class="shop-details">
+<div class="shop-preview" style="background-color: ${skin.isCustom ? customColors.shipColor : skin.shipColor};"></div>
+<div class="shop-info">
+<div class="shop-name-wrapper"><span class="shop-name">${skin.name}</span><span>${customControls}</span></div>
+<div class="shop-desc">${skin.desc}</div>
+<div class="shop-price">${isOwned ? 'Owned' : `${skin.price} <span class="coin-icon"></span>`}</div>
+</div>
+</div><div class="shop-actions">${actionsHTML}</div>`;
+skinsContainer.appendChild(item);
+});
+}
+
+// --- Multiplayer Logic ---
+function initializePeer(id) {
+if (peer) peer.destroy(); peer = new Peer(id);
+peer.on('open', (id) => {
+myPeerId = id; console.log('My peer ID is: ' + id);
+if (isHost) { mpStatus.textContent = `Room Created! ID: ${id}`; roomIdInput.value = id; roomIdInput.disabled = true; createRoomButton.disabled = true; joinRoomButton.disabled = true; }
+});
+peer.on('connection', (connection) => { console.log('A player has connected!'); conn = connection; setupConnectionEvents(); });
+peer.on('error', (err) => { console.error(err); mpStatus.textContent = `Error: ${err.type}. Try another ID.`; resetMultiplayerUI(); });
+}
+function setupConnectionEvents() {
+conn.on('open', () => {
+if (isHost) {
+mpStatus.textContent = 'Player 2 connected! Starting game...';
+const pTemplate = new Player(); const yPos = pTemplate.y;
+players[myPeerId] = { x: canvasWidth / 2 - 60, y: yPos, score: 0, coins: 0, color: '#0ff' };
+players[conn.peer] = { x: canvasWidth / 2 + 20, y: yPos, score: 0, coins: 0, color: '#ff4500' };
+setTimeout(startMultiplayerGame, 1500);
+} else { mpStatus.textContent = 'Connected! Waiting for host to start...'; }
+});
+conn.on('data', (data) => {
+if (isHost) {
+if (data.type === 'input' && players[conn.peer]) {
+const clientPlayer = players[conn.peer];
+if (data.key === 'ArrowLeft' && clientPlayer.x > 0) clientPlayer.x -= player.speed;
+if (data.key === 'ArrowRight' && clientPlayer.x < canvasWidth - player.width) clientPlayer.x += player.speed;
+}
+} else {
+if (data.type === 'gameState' && gameOver) { startMultiplayerGame(); }
+if (data.type === 'gameState') { asteroids = data.asteroids; coins = data.coins; players = data.players; } 
+else if (data.type === 'gameOver') { endGame(data.loser); }
+}
+});
+conn.on('close', () => { if(!gameOver) { mpStatus.textContent = 'Player disconnected.'; endGame(); } });
+}
+function startMultiplayerGame() {
+isMultiplayer = true; setCanvasDimensions();
+player = new Player(); stars = []; for (let i = 0; i < 150; i++) stars.push(new Star());
+asteroids = []; coins = []; particles = []; frameCount = 0; gameOver = false; gameSpeed = 2.0; asteroidSpawnRate = 120;
+startScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameOverScreen.style.display = 'none';
+gameStatsContainer.style.display = 'flex'; if (isMobileDevice()) mobileControls.style.display = 'flex';
+multiPlayerGameLoop();
+}
+function resetMultiplayerUI() {
+if(peer) peer.destroy(); peer = null; conn = null; isHost = false;
+roomIdInput.value = ''; roomIdInput.disabled = false; createRoomButton.disabled = false; joinRoomButton.disabled = false;
+mpStatus.textContent = "Create a room or join a friend's.";
+}
+
+// --- EVENT LISTENERS ---
+window.addEventListener('keydown', e => keys[e.key] = true); window.addEventListener('keyup', e => keys[e.key] = false);
+startButton.addEventListener('click', init); 
+restartButton.addEventListener('click', init);
+shopButton.addEventListener('click', () => { startScreen.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
+closeShopButton.addEventListener('click', () => { shopScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+settingsButton.addEventListener('click', () => { startScreen.style.display = 'none'; settingsScreen.style.display = 'flex'; });
+closeSettingsButton.addEventListener('click', () => { settingsScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+howToPlayButton.addEventListener('click', () => { startScreen.style.display = 'none'; howToPlayScreen.style.display = 'flex'; });
+closeHowToPlayButton.addEventListener('click', () => { howToPlayScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+goToMenuButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); gameOver = true; });
+goToShopButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
+resetHighScoreButton.addEventListener('click', () => { if (confirm('Are you sure you want to reset your High Score? This cannot be undone.')) { highScore = 0; saveData(); alert('High Score reset!'); } });
+resetProgressButton.addEventListener('click', resetProgress);
+if (isMobileDevice()) { leftBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowLeft'] = true; }, { passive: false }); leftBtn.addEventListener('touchend', () => keys['ArrowLeft'] = false); rightBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowRight'] = true; }, { passive: false }); rightBtn.addEventListener('touchend', () => keys['ArrowRight'] = false); }
+window.addEventListener('resize', () => { setCanvasDimensions(); if (player && !gameOver) { player.y = canvasHeight - player.height - (isMobileDevice() ? 150 : 30); } });
+
+multiplayerButton.addEventListener('click', () => { startScreen.style.display = 'none'; multiplayerScreen.style.display = 'flex'; setCanvasDimensions(); });
+backToMenuButton.addEventListener('click', () => { multiplayerScreen.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); });
+createRoomButton.addEventListener('click', () => { isHost = true; let roomId = 'cosmic' + Math.floor(Math.random() * 9000 + 1000); initializePeer(roomId); });
+joinRoomButton.addEventListener('click', () => {
+isHost = false; const roomId = roomIdInput.value.trim();
+if (!roomId) { mpStatus.textContent = 'Please enter a Room ID to join.'; return; }
+initializePeer();
+setTimeout(() => {
+if (!peer || !peer.id) { mpStatus.textContent = 'Error getting Peer ID. Check connection.'; return; }
+conn = peer.connect(roomId); mpStatus.textContent = `Connecting to room: ${roomId}...`; setupConnectionEvents();
+}, 1000);
+});
+
+// Initial setup on page load
+loadData();
+setCanvasDimensions();
+gameStatsContainer.style.display = 'none';
 </script>
-
 </body>
 </html>
