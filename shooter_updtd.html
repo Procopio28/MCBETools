@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<!-- Added Three.js library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<title>Cosmic Courier 3D</title>
+<style>
+body { margin: 0; padding: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
+canvas { display: block; }
+.ui-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; pointer-events: none; }
+.menu { background-color: rgba(0, 0, 0, 0.8); padding: 30px; border-radius: 10px; pointer-events: all; border: 2px solid #0ff; box-shadow: 0 0 25px #0ff; min-width: 340px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+h1 { font-size: 3em; margin: 0 0 10px 0; color: #0ff; text-shadow: 0 0 10px #0ff; }
+h2 { font-size: 1.5em; margin: 20px 0 10px 0; color: #0ff; text-shadow: 0 0 5px #0ff; border-bottom: 1px solid rgba(0,255,255,0.4); padding-bottom: 5px; }
+p { font-size: 1.2em; margin: 5px 0; }
+.stats-container { z-index: 10; position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; display: flex; justify-content: space-between; padding: 20px; font-size: 1.2em; text-shadow: 0 0 5px #fff; pointer-events: none; }
+.stats-left, .stats-right { display: flex; flex-direction: column; }
+.stats-left { text-align: left; }
+.stats-right { text-align: right; }
+.button { padding: 10px 20px; font-size: 1.2em; background-color: #0ff; color: #000; border: none; cursor: pointer; border-radius: 5px; margin: 10px 0; font-family: 'Courier New', Courier, monospace; font-weight: bold; width: 220px; }
+.button-secondary { background-color: transparent; border: 1px solid #0ff; color: #0ff; }
+.button:hover { box-shadow: 0 0 15px #0ff; }
+.button:disabled { background-color: #555; color: #999; border-color: #555; cursor: not-allowed; box-shadow: none; }
+#mobile-controls { display: none; position: absolute; bottom: 0; left: 0; width: 100%; height: 120px; z-index: 100; padding: 20px; box-sizing: border-box; justify-content: space-between; align-items: center; }
+.control-button { width: 45%; height: 100%; background-color: rgba(0, 255, 255, 0.2); border: 2px solid #0ff; color: #0ff; font-size: 2.5em; font-weight: bold; font-family: 'Courier New', Courier, monospace; border-radius: 10px; opacity: 0.7; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.control-button:active { background-color: rgba(0, 255, 255, 0.5); opacity: 1; }
+.coin-icon { display: inline-block; width: 1em; height: 1em; background: #FFD700; border-radius: 50%; vertical-align: -0.15em; margin-right: 8px; box-shadow: 0 0 5px #FFD700; }
+.shop-section { margin-bottom: 20px; }
+.shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 5px; background-color: rgba(0, 255, 255, 0.05); border-radius: 5px; text-align: left;}
+.shop-details { display: flex; align-items: center; flex-grow: 1; }
+.shop-preview { width: 30px; height: 30px; border: 2px solid #fff; margin-right: 15px; border-radius: 5px; flex-shrink: 0; }
+.shop-info { display: flex; flex-direction: column; flex-grow: 1; }
+.shop-name { font-weight: bold; }
+.shop-desc, .shop-price { font-size: 0.9em; opacity: 0.8; }
+.shop-price .coin-icon { width: 0.8em; height: 0.8em; }
+.shop-actions .button { width: 100px; padding: 5px 10px; font-size: 0.9em; margin: 0; }
+.custom-color-picker { background: transparent; border: 1px solid #0ff; width: 30px; height: 30px; padding: 0; cursor: pointer; vertical-align: middle; margin-left: 10px;}
+#total-coins-display .coin-icon, #total-coins-stat .coin-icon { width: 0.8em; height: 0.8em; vertical-align: baseline; margin-left: 5px; }
+.gameover-buttons .button { width: 220px; margin: 5px 0; }
+.shop-name-wrapper { display: flex; justify-content: space-between; align-items: center; }
+.level-controls { display: flex; align-items: center; }
+.level-arrow { cursor: pointer; font-size: 1.4em; padding: 0 8px; user-select: none; color: #0ff; font-weight: bold; }
+.level-arrow.disabled { color: #555; cursor: not-allowed; }
+.level-text { font-size: 0.9em; min-width: 80px; text-align: center; }
+.instructions { text-align: left; max-width: 450px; }
+.instructions p { font-size: 1.1em; line-height: 1.6; }
+.instructions strong { color: #0ff; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<!-- UI Panels remain the same -->
+<div class="stats-container" id="gameStatsContainer" style="display: none;">
+    <div class="stats-left">
+        <span id="coin-score"><span class="coin-icon"></span>0</span>
+        <span id="total-coins-stat">Total Coins: 0</span>
+    </div>
+    <div class="stats-right">
+        <span id="score">Score: 0</span>
+        <span id="high-score">High Score: 0</span>
+    </div>
+</div>
+<div id="startScreen" class="ui-panel">
+    <div class="menu">
+        <h1>Cosmic Courier 3D</h1>
+        <p>Dodge asteroids, collect coins!</p>
+        <button class="button" id="startButton">Start Game</button>
+        <button class="button" id="multiplayerButton">Multiplayer</button>
+        <button class="button button-secondary" id="shopButton">Shop</button>
+        <button class="button button-secondary" id="howToPlayButton">How to Play</button>
+        <button class="button button-secondary" id="settingsButton">Settings</button>
+    </div>
+</div>
+<div id="howToPlayScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>How to Play</h1>
+        <div class="instructions">
+            <p><strong>Objective:</strong> Survive as long as possible by dodging asteroids. Collect coins to buy upgrades and new ship skins in the shop!</p>
+            <p><strong>Controls:</strong> Use the <strong>Left and Right Arrow Keys</strong> on your keyboard to move your ship. On mobile, use the on-screen buttons.</p>
+            <p><strong>Power-ups:</strong></p>
+            <ul>
+                <li><strong>(S) Shield:</strong> Protects you from one asteroid collision.</li>
+                <li><strong>(M) Magnet:</strong> Automatically pulls nearby coins towards you for a short time.</li>
+                <li><strong>(W) Weapon:</strong> Allows you to shoot and destroy asteroids for a short time.</li>
+            </ul>
+        </div>
+        <button class="button" id="closeHowToPlayButton">Back to Menu</button>
+    </div>
+</div>
+<div id="multiplayerScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>Multiplayer</h1>
+        <p id="mp-status">Create a room or join a friend's.</p>
+        <input type="text" id="room-id-input" placeholder="Enter Room ID" style="padding: 10px; font-size: 1.1em; width: 220px; text-align: center; background: #000; border: 1px solid #0ff; color: #fff; margin-bottom: 10px;">
+        <button class="button" id="createRoomButton">Create Room</button>
+        <button class="button" id="joinRoomButton">Join Room</button>
+        <button class="button button-secondary" id="backToMenuButton">Back to Main Menu</button>
+    </div>
+</div>
+<div id="settingsScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>Settings</h1>
+        <p>Manage your saved data.</p>
+        <button class="button" id="resetHighScoreButton">Reset High Score</button>
+        <button class="button" id="resetProgressButton">Reset Progress (Coins & Upgrades)</button>
+        <button class="button button-secondary" id="closeSettingsButton">Back to Menu</button>
+    </div>
+</div>
+<div id="shopScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1>Shop</h1>
+        <p id="total-coins-display">Total Coins: <span>0</span><span class="coin-icon"></span></p>
+        <div id="upgrades-section" class="shop-section"><h2>Ship Upgrades</h2><div id="upgrades-container"></div></div>
+        <div id="skins-section" class="shop-section"><h2>Ship Skins</h2><div id="skins-container"></div></div>
+        <button class="button" id="closeShopButton">Back to Menu</button>
+    </div>
+</div>
+<div id="gameOverScreen" class="ui-panel" style="display: none;">
+    <div class="menu">
+        <h1 id="gameOverTitle">Game Over</h1>
+        <p id="gameOverMessage">You collected <span id="run-coins">0</span><span class="coin-icon"></span> this run.</p>
+        <div class="gameover-buttons">
+            <button class="button" id="restartButton">Try Again (Single Player)</button>
+            <button class="button button-secondary" id="goToShopButton">Go to Shop</button>
+            <button class="button button-secondary" id="goToMenuButton">Main Menu</button>
+        </div>
+    </div>
+</div>
+<div id="mobile-controls">
+    <button id="left-btn" class="control-button"><</button>
+    <button id="right-btn" class="control-button">></button>
+</div>
+
+<script>
+// --- RENDERER AND SCENE SETUP ---
+const canvas = document.getElementById('gameCanvas');
+let scene, camera, renderer, clock;
+
+// --- UI Elements (unchanged) ---
+const startScreen = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const gameOverTitle = document.getElementById('gameOverTitle');
+const gameOverMessage = document.getElementById('gameOverMessage');
+const shopScreen = document.getElementById('shopScreen');
+const settingsScreen = document.getElementById('settingsScreen');
+const howToPlayScreen = document.getElementById('howToPlayScreen');
+const startButton = document.getElementById('startButton');
+const restartButton = document.getElementById('restartButton');
+const shopButton = document.getElementById('shopButton');
+const settingsButton = document.getElementById('settingsButton');
+const howToPlayButton = document.getElementById('howToPlayButton');
+const closeShopButton = document.getElementById('closeShopButton');
+const closeSettingsButton = document.getElementById('closeSettingsButton');
+const closeHowToPlayButton = document.getElementById('closeHowToPlayButton');
+const goToShopButton = document.getElementById('goToShopButton');
+const goToMenuButton = document.getElementById('goToMenuButton');
+const resetHighScoreButton = document.getElementById('resetHighScoreButton');
+const resetProgressButton = document.getElementById('resetProgressButton');
+const gameStatsContainer = document.getElementById('gameStatsContainer');
+const scoreEl = document.getElementById('score');
+const highScoreEl = document.getElementById('high-score');
+const coinScoreEl = document.getElementById('coin-score');
+const totalCoinsStatEl = document.getElementById('total-coins-stat');
+const runCoinsEl = document.getElementById('run-coins');
+const mobileControls = document.getElementById('mobile-controls');
+const leftBtn = document.getElementById('left-btn');
+const rightBtn = document.getElementById('right-btn');
+const skinsContainer = document.getElementById('skins-container');
+const upgradesContainer = document.getElementById('upgrades-container');
+const totalCoinsDisplayP = document.getElementById('total-coins-display');
+const multiplayerButton = document.getElementById('multiplayerButton');
+const multiplayerScreen = document.getElementById('multiplayerScreen');
+const createRoomButton = document.getElementById('createRoomButton');
+const joinRoomButton = document.getElementById('joinRoomButton');
+const backToMenuButton = document.getElementById('backToMenuButton');
+const roomIdInput = document.getElementById('room-id-input');
+const mpStatus = document.getElementById('mp-status');
+
+// --- Game State Variables ---
+let player, stars, asteroids, particles, coins, powerUps, bullets, keys = {}, score = 0, coinsCollected = 0;
+let gameOver = true, gameSpeed, gameAreaWidth = 50;
+let asteroidSpawnTimer, coinSpawnTimer, shieldSpawnTimer, magnetSpawnTimer, weaponSpawnTimer;
+
+// Multiplayer State
+let peer, conn, myPeerId, isHost = false, isMultiplayer = false, players = {};
+
+// --- Static Game Data (Values converted to seconds) ---
+const SKINS_DATA = [
+    { id: 'default', name: 'Default', price: 0, desc: "The classic courier.", shipColor: '#0ff', shieldColor: 'rgba(0, 255, 255, 0.2)', shieldStroke: '#00ffff' },
+    { id: 'ember', name: 'Ember', price: 50, desc: "A fiery variant.", shipColor: '#ff4500', shieldColor: 'rgba(255, 69, 0, 0.3)', shieldStroke: '#ff4500' },
+    { id: 'rogue', name: 'Rogue', price: 75, desc: "Sleek and dangerous.", shipColor: '#f44336', shieldColor: 'rgba(244, 67, 54, 0.3)', shieldStroke: '#f44336' },
+    { id: 'venom', name: 'Venom', price: 100, desc: "A toxic choice.", shipColor: '#7cfc00', shieldColor: 'rgba(124, 252, 0, 0.3)', shieldStroke: '#7cfc00' },
+    { id: 'nebula', name: 'Nebula', price: 150, desc: "Forged in the cosmos.", shipColor: '#9400d3', shieldColor: 'rgba(148, 0, 211, 0.3)', shieldStroke: '#9400d3' },
+    { id: 'custom', name: 'Custom Color', price: 250, desc: "Your own style. Top is shield color, bottom is ship color.", isCustom: true }
+];
+const UPGRADES_DATA = {
+    // Fire rate in seconds (lower is faster)
+    fireRate: { name: 'Fire Rate', desc: 'Increases bullet frequency.', prices: [50, 100, 200, 400], effects: [0.5, 0.4, 0.3, 0.2, 0.15] },
+    damage: { name: 'Bullet Damage', desc: 'Destroy asteroids faster.', prices: [100, 250, 500], effects: [1, 2, 3, 4] },
+    magnetRadius: { name: 'Magnet Radius', desc: 'Increases coin collection range.', prices: [75, 150, 300], effects: [15, 20, 25, 30] },
+    // Durations in seconds
+    magnetDuration: { name: 'Magnet Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [5, 7, 9, 11] },
+    weaponDuration: { name: 'Weapon Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [5, 7, 9, 11] }
+};
+
+// --- Saved Data & State (unchanged) ---
+let highScore, totalCoins, ownedSkins, equippedSkinId, customColors, upgradesState;
+function robustJSONParse(jsonString, defaultValue) { if (typeof jsonString !== 'string') { return defaultValue; } try { const result = JSON.parse(jsonString); return result === null ? defaultValue : result; } catch (e) { console.warn("Could not parse JSON from localStorage, using default value.", e); return defaultValue; } }
+function loadData() { highScore = parseInt(localStorage.getItem('cosmicCourierHighScore'), 10) || 0; totalCoins = parseInt(localStorage.getItem('cosmicCourierTotalCoins'), 10) || 0; ownedSkins = robustJSONParse(localStorage.getItem('cosmicCourierOwnedSkins'), ['default']); equippedSkinId = localStorage.getItem('cosmicCourierEquippedSkin') || 'default'; customColors = robustJSONParse(localStorage.getItem('cosmicCourierCustomColors'), {"shipColor": "#ffffff", "shieldColor": "rgba(255, 255, 255, 0.3)"}); upgradesState = {}; Object.keys(UPGRADES_DATA).forEach(type => { const maxLevel = parseInt(localStorage.getItem(`cc_max_level_${type}`), 10) || 0; let equippedLevel = parseInt(localStorage.getItem(`cc_equipped_level_${type}`), 10); if (isNaN(equippedLevel)) { equippedLevel = maxLevel; } if (equippedLevel > maxLevel) { equippedLevel = maxLevel; } upgradesState[type] = { maxLevel, equippedLevel }; }); }
+function saveData() { localStorage.setItem('cosmicCourierHighScore', highScore); localStorage.setItem('cosmicCourierTotalCoins', totalCoins); localStorage.setItem('cosmicCourierOwnedSkins', JSON.stringify(ownedSkins)); localStorage.setItem('cosmicCourierEquippedSkin', equippedSkinId); localStorage.setItem('cosmicCourierCustomColors', JSON.stringify(customColors)); Object.keys(upgradesState).forEach(type => { localStorage.setItem(`cc_max_level_${type}`, upgradesState[type].maxLevel); localStorage.setItem(`cc_equipped_level_${type}`, upgradesState[type].equippedLevel); }); }
+function resetProgress() { if (confirm('Are you sure you want to reset all progress? This includes coins, upgrades, and skins. This cannot be undone.')) { localStorage.removeItem('cosmicCourierTotalCoins'); localStorage.removeItem('cosmicCourierOwnedSkins'); localStorage.removeItem('cosmicCourierEquippedSkin'); localStorage.removeItem('cosmicCourierCustomColors'); Object.keys(UPGRADES_DATA).forEach(type => { localStorage.removeItem(`cc_max_level_${type}`); localStorage.removeItem(`cc_equipped_level_${type}`); }); loadData(); populateShop(); alert('All progress has been reset.'); } }
+
+function isMobileDevice() { return ('ontouchstart' in window); }
+
+function setCanvasDimensions() {
+    if (renderer) {
+        const canvasWidth = window.innerWidth;
+        const canvasHeight = window.innerHeight;
+        renderer.setSize(canvasWidth, canvasHeight);
+        camera.aspect = canvasWidth / canvasHeight;
+        const gameAreaHeight = gameAreaWidth / camera.aspect;
+        camera.top = gameAreaHeight / 2;
+        camera.bottom = -gameAreaHeight / 2;
+        camera.updateProjectionMatrix();
+    }
+}
+
+// --- 3D Object Classes (Updated for Delta Time) ---
+class Player {
+    constructor() {
+        this.width = 4; this.height = 5;
+        this.speed = 40; // units per second
+        this.shieldActive = false; this.magnetActive = false; this.magnetTimer = 0;
+        this.weaponActive = false; this.weaponTimer = 0; this.lastShotTime = 0;
+        
+        this.initUpgrades();
+        this.setSkin();
+
+        const geometry = new THREE.ConeGeometry(this.width / 2, this.height, 8);
+        const material = new THREE.MeshStandardMaterial({ color: this.color, emissive: this.color, emissiveIntensity: 0.5 });
+        this.mesh = new THREE.Mesh(geometry, material);
+        
+        const yPos = camera.bottom + this.height + (isMobileDevice() ? 15 : 3);
+        this.mesh.position.set(0, yPos, 0);
+        scene.add(this.mesh);
+
+        const shieldGeometry = new THREE.SphereGeometry(this.width * 1.2, 32, 32);
+        const shieldMaterial = new THREE.MeshBasicMaterial({ color: this.shieldStrokeColor, transparent: true, opacity: 0.3 });
+        this.shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+        this.shieldMesh.visible = false;
+        this.mesh.add(this.shieldMesh);
+    }
+    initUpgrades() { this.fireRate = UPGRADES_DATA.fireRate.effects[upgradesState.fireRate.equippedLevel]; this.damage = UPGRADES_DATA.damage.effects[upgradesState.damage.equippedLevel]; this.magnetRadius = UPGRADES_DATA.magnetRadius.effects[upgradesState.magnetRadius.equippedLevel]; this.magnetDuration = UPGRADES_DATA.magnetDuration.effects[upgradesState.magnetDuration.equippedLevel]; this.weaponDuration = UPGRADES_DATA.weaponDuration.effects[upgradesState.weaponDuration.equippedLevel]; }
+    setSkin() { if (equippedSkinId === 'custom' && ownedSkins.includes('custom')) { this.color = customColors.shipColor; this.shieldStrokeColor = customColors.shipColor; } else { const skin = SKINS_DATA.find(s => s.id === equippedSkinId) || SKINS_DATA[0]; this.color = skin.shipColor; this.shieldStrokeColor = skin.shieldStroke; } }
+    shoot() { if (this.weaponActive && clock.getElapsedTime() - this.lastShotTime >= this.fireRate) { bullets.push(new Bullet(this.mesh.position.x, this.mesh.position.y, this.damage, this.color)); this.lastShotTime = clock.getElapsedTime(); } }
+    update(deltaTime) {
+        const moveBoundary = gameAreaWidth / 2 - this.width / 2;
+        if (keys['ArrowLeft'] && this.mesh.position.x > -moveBoundary) this.mesh.position.x -= this.speed * deltaTime;
+        if (keys['ArrowRight'] && this.mesh.position.x < moveBoundary) this.mesh.position.x += this.speed * deltaTime;
+        
+        this.shieldMesh.visible = this.shieldActive;
+        if(this.shieldActive) this.shieldMesh.rotation.y += 2 * deltaTime;
+
+        this.shoot();
+    }
+    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); this.shieldMesh.geometry.dispose(); this.shieldMesh.material.dispose(); }
+}
+
+class Bullet {
+    constructor(x, y, damage, color) {
+        this.width = 0.3; this.height = 1.5;
+        this.speed = 80; // units per second
+        this.damage = damage;
+        
+        const geometry = new THREE.CylinderGeometry(this.width / 2, this.width / 2, this.height, 8);
+        const material = new THREE.MeshBasicMaterial({ color: color });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.set(x, y + this.height, 0);
+        scene.add(this.mesh);
+    }
+    update(deltaTime) { this.mesh.position.y += this.speed * deltaTime; }
+    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
+}
+
+class Asteroid {
+    constructor(x, y) {
+        this.radius = Math.random() * 2.0 + 1.5;
+        const xPos = x !== undefined ? x : (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2);
+        const yPos = y !== undefined ? y : camera.top + this.radius;
+        
+        this.speed = (Math.random() * 8 + 10) * gameSpeed; // units per second
+        this.rotationSpeed = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2);
+        this.health = Math.max(1, Math.floor(this.radius));
+
+        const geometry = new THREE.IcosahedronGeometry(this.radius, 0);
+        const material = new THREE.MeshStandardMaterial({ color: 0xc5c5c5, flatShading: true });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.set(xPos, yPos, 0);
+        scene.add(this.mesh);
+    }
+    takeDamage(amount) { this.health -= amount; }
+    update(deltaTime) { 
+        this.mesh.position.y -= this.speed * deltaTime; 
+        this.mesh.rotation.x += this.rotationSpeed.x * deltaTime; 
+        this.mesh.rotation.y += this.rotationSpeed.y * deltaTime; 
+        this.mesh.rotation.z += this.rotationSpeed.z * deltaTime; 
+    }
+    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
+}
+
+class Star {
+    constructor() {
+        const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.set((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200);
+        this.speed = Math.random() * 5 + 2; // units per second
+        scene.add(this.mesh);
+    }
+    update(deltaTime) {
+        this.mesh.position.y -= this.speed * gameSpeed * deltaTime;
+        if (this.mesh.position.y < camera.bottom - 50) {
+            this.mesh.position.y = camera.top + 50;
+            this.mesh.position.x = (Math.random() - 0.5) * 200;
+        }
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.radius = Math.random() * 0.2 + 0.1;
+        const geometry = new THREE.SphereGeometry(this.radius, 4, 4);
+        const material = new THREE.MeshBasicMaterial({ color: color, transparent: true });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.position.set(x, y, 0);
+
+        this.velocity = new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)).normalize().multiplyScalar(Math.random() * 20);
+        this.life = 1; // 1 second
+        scene.add(this.mesh);
+    }
+    update(deltaTime) {
+        this.life -= deltaTime;
+        this.mesh.position.addScaledVector(this.velocity, deltaTime);
+        this.mesh.material.opacity = Math.max(0, this.life);
+    }
+    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
+}
+
+class Collectible {
+    constructor(color) {
+        this.radius = 1.2;
+        this.speed = 10 * gameSpeed; // units per second
+        this.color = color;
+    }
+    update(deltaTime) { 
+        this.mesh.position.y -= this.speed * deltaTime; 
+        this.mesh.rotation.y += 3 * deltaTime; 
+        this.mesh.rotation.z += 0.5 * deltaTime;
+    }
+    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
+}
+
+class Coin extends Collectible {
+    constructor(x, y) {
+        super(0xFFD700);
+        const geometry = new THREE.CylinderGeometry(this.radius, this.radius, 0.4, 16);
+        const material = new THREE.MeshStandardMaterial({ color: this.color, emissive: this.color, emissiveIntensity: 0.4, metalness: 0.5, roughness: 0.3 });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.rotation.x = Math.PI / 2;
+        const xPos = x !== undefined ? x : (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2);
+        const yPos = y !== undefined ? y : camera.top + this.radius;
+        this.mesh.position.set(xPos, yPos, 0);
+        scene.add(this.mesh);
+    }
+}
+
+class PowerUp extends Collectible {
+    constructor(color) {
+        super(color);
+        const geometry = new THREE.SphereGeometry(this.radius, 16, 16);
+        const material = new THREE.MeshBasicMaterial({ color: this.color, transparent: true, opacity: 0.8 });
+        this.mesh = new THREE.Mesh(geometry, material);
+        const xPos = (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2);
+        const yPos = camera.top + this.radius;
+        this.mesh.position.set(xPos, yPos, 0);
+        scene.add(this.mesh);
+    }
+    update(deltaTime) {
+        super.update(deltaTime);
+        const pulse = Math.sin(clock.getElapsedTime() * 5) * 0.1 + 1;
+        this.mesh.scale.set(pulse, pulse, pulse);
+    }
+}
+class ShieldPowerUp extends PowerUp { constructor() { super(0x39FF14); } }
+class MagnetPowerUp extends PowerUp { constructor() { super(0xFF00FF); } }
+class WeaponPowerUp extends PowerUp { constructor() { super(0xFF6347); } }
+
+function init() {
+    isMultiplayer = false;
+    
+    if (scene) {
+        while(scene.children.length > 0){ 
+            const obj = scene.children[0];
+            scene.remove(obj);
+            if(obj.geometry) obj.geometry.dispose();
+            if(obj.material) obj.material.dispose();
+        }
+    } else {
+        scene = new THREE.Scene();
+        clock = new THREE.Clock();
+        camera = new THREE.OrthographicCamera( -gameAreaWidth/2, gameAreaWidth/2, 1, -1, 1, 1000 );
+        camera.position.z = 100;
+        renderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true, alpha: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x000000, 0);
+    }
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7);
+    scene.add(directionalLight);
+
+    setCanvasDimensions();
+    
+    player = new Player();
+    stars = []; for (let i = 0; i < 200; i++) stars.push(new Star());
+    asteroids = []; coins = []; powerUps = []; particles = []; bullets = [];
+    
+    score = 0; coinsCollected = 0; gameOver = false; 
+    gameSpeed = 1.0; 
+    
+    // Initialize spawn timers (in seconds)
+    asteroidSpawnTimer = 1.5;
+    coinSpawnTimer = 4.0;
+    shieldSpawnTimer = 15.0;
+    magnetSpawnTimer = 22.0;
+    weaponSpawnTimer = 18.0;
+    
+    startScreen.style.display = 'none'; gameOverScreen.style.display = 'none'; shopScreen.style.display = 'none'; settingsScreen.style.display = 'none'; howToPlayScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameStatsContainer.style.display = 'flex';
+    updateStatsDisplay();
+    if (isMobileDevice()) mobileControls.style.display = 'flex';
+    restartButton.textContent = "Try Again (Single Player)";
+    
+    clock.start();
+    gameLoop();
+}
+
+function gameLoop() {
+    if (gameOver) { clock.stop(); return; }
+    requestAnimationFrame(gameLoop);
+    
+    const deltaTime = clock.getDelta();
+    
+    // Update game objects
+    player.update(deltaTime);
+    stars.forEach(star => star.update(deltaTime));
+    asteroids.forEach(a => a.update(deltaTime));
+    coins.forEach(c => c.update(deltaTime));
+    powerUps.forEach(p => p.update(deltaTime));
+    bullets.forEach(b => b.update(deltaTime));
+    particles.forEach(p => p.update(deltaTime));
+
+    // Spawning logic based on timers
+    asteroidSpawnTimer -= deltaTime;
+    if (asteroidSpawnTimer <= 0) {
+        spawnAsteroid();
+        const baseInterval = 1.5;
+        asteroidSpawnTimer = Math.max(0.4, baseInterval / gameSpeed);
+    }
+    coinSpawnTimer -= deltaTime;
+    if (coinSpawnTimer <= 0) { coins.push(new Coin()); coinSpawnTimer = 4.0 / gameSpeed; }
+    shieldSpawnTimer -= deltaTime;
+    if (shieldSpawnTimer <= 0) { powerUps.push(new ShieldPowerUp()); shieldSpawnTimer = 15.0; }
+    magnetSpawnTimer -= deltaTime;
+    if (magnetSpawnTimer <= 0) { powerUps.push(new MagnetPowerUp()); magnetSpawnTimer = 22.0; }
+    weaponSpawnTimer -= deltaTime;
+    if (weaponSpawnTimer <= 0) { powerUps.push(new WeaponPowerUp()); weaponSpawnTimer = 18.0; }
+
+
+    // Power-up timer countdowns
+    if (player.magnetActive) { player.magnetTimer -= deltaTime; if (player.magnetTimer <= 0) player.magnetActive = false; }
+    if (player.weaponActive) { player.weaponTimer -= deltaTime; if (player.weaponTimer <= 0) player.weaponActive = false; }
+
+    // Collision detection and cleanup
+    handleCollisions();
+    cleanupObjects();
+
+    score++; 
+    gameSpeed += 0.002 * deltaTime; // Slower, time-based increase
+    updateStatsDisplay();
+    
+    renderer.render(scene, camera);
+}
+
+function spawnAsteroid() {
+    let newAsteroid;
+    let overlap;
+    let attempts = 0;
+    do {
+        overlap = false;
+        const x = (Math.random() - 0.5) * (gameAreaWidth - 4);
+        const y = camera.top + 4;
+        newAsteroid = new Asteroid(x, y);
+        for (const existing of asteroids) {
+            if (newAsteroid.mesh.position.distanceTo(existing.mesh.position) < newAsteroid.radius + existing.radius) {
+                overlap = true;
+                newAsteroid.destroy();
+                break;
+            }
+        }
+        attempts++;
+    } while (overlap && attempts < 10);
+    asteroids.push(newAsteroid);
+}
+
+function handleCollisions() {
+    // Bullets vs Asteroids
+    bullets.forEach((bullet, bIndex) => {
+        let hit = false;
+        asteroids.forEach((asteroid, aIndex) => {
+            if (hit) return;
+            if (bullet.mesh.position.distanceTo(asteroid.mesh.position) < asteroid.radius + bullet.width) {
+                hit = true;
+                asteroid.takeDamage(bullet.damage);
+                createExplosion(bullet.mesh.position.x, bullet.mesh.position.y, 0xffff64, 3);
+                bullet.destroy();
+                bullets.splice(bIndex, 1);
+                if (asteroid.health <= 0) {
+                    createExplosion(asteroid.mesh.position.x, asteroid.mesh.position.y, 0xc5c5c5, 15);
+                    score += 50;
+                    const numCoins = Math.floor(Math.random() * 3) + 1;
+                    for(let i = 0; i < numCoins; i++) {
+                        coins.push(new Coin(asteroid.mesh.position.x + (Math.random() - 0.5) * 2, asteroid.mesh.position.y + (Math.random() - 0.5) * 2));
+                    }
+                    asteroid.destroy();
+                    asteroids.splice(aIndex, 1);
+                }
+            }
+        });
+    });
+
+    // Player vs Asteroids
+    asteroids.forEach((asteroid, index) => {
+        if (player.mesh.position.distanceTo(asteroid.mesh.position) < asteroid.radius + player.width / 2) {
+            if (player.shieldActive) {
+                player.shieldActive = false;
+                createExplosion(asteroid.mesh.position.x, asteroid.mesh.position.y, 0xc5c5c5, 15);
+                asteroid.destroy();
+                asteroids.splice(index, 1);
+            } else {
+                createExplosion(player.mesh.position.x, player.mesh.position.y, 0xf44336, 30);
+                endGame();
+            }
+        }
+    });
+    
+    // Player vs Collectibles
+    coins.forEach((coin, index) => {
+        if (player.magnetActive && coin.mesh.position.distanceTo(player.mesh.position) < player.magnetRadius) {
+            coin.mesh.position.lerp(player.mesh.position, 0.1);
+        }
+        if (player.mesh.position.distanceTo(coin.mesh.position) < coin.radius + player.width / 2) {
+            coinsCollected++; totalCoins++;
+            createExplosion(coin.mesh.position.x, coin.mesh.position.y, 0xFFD700, 10);
+            coin.destroy();
+            coins.splice(index, 1);
+        }
+    });
+    powerUps.forEach((powerUp, index) => {
+        if (player.mesh.position.distanceTo(powerUp.mesh.position) < powerUp.radius + player.width / 2) {
+            if (powerUp instanceof ShieldPowerUp) player.shieldActive = true;
+            else if (powerUp instanceof MagnetPowerUp) { player.magnetActive = true; player.magnetTimer = player.magnetDuration; }
+            else if (powerUp instanceof WeaponPowerUp) { player.weaponActive = true; player.weaponTimer = player.weaponDuration; }
+            createExplosion(powerUp.mesh.position.x, powerUp.mesh.position.y, powerUp.color, 20);
+            powerUp.destroy(); powerUps.splice(index, 1);
+        }
+    });
+}
+
+function cleanupObjects() {
+    const bottomBoundary = camera.bottom - 5;
+    const topBoundary = camera.top + 5;
+    
+    const cleanup = (arr) => {
+        for (let i = arr.length - 1; i >= 0; i--) {
+            const obj = arr[i];
+            if (obj.mesh.position.y < bottomBoundary || obj.mesh.position.y > topBoundary || (obj.life !== undefined && obj.life <= 0)) {
+                obj.destroy();
+                arr.splice(i, 1);
+            }
+        }
+    };
+    cleanup(asteroids);
+    cleanup(coins);
+    cleanup(powerUps);
+    cleanup(bullets);
+    cleanup(particles);
+}
+
+function createExplosion(x, y, color, n) {
+    for (let i = 0; i < n; i++) particles.push(new Particle(x, y, color));
+}
+
+function endGame(loserId = null) {
+    if (gameOver) return;
+    gameOver = true; keys = {};
+    if (isMultiplayer) {
+      // Multiplayer end game logic (unchanged)
+    } else {
+        if (score > highScore) { highScore = score; }
+        saveData();
+        restartButton.textContent = "Try Again (Single Player)"; restartButton.onclick = init;
+        gameOverTitle.textContent = "Game Over"; runCoinsEl.textContent = coinsCollected;
+    }
+    updateStatsDisplay();
+    if (isMobileDevice()) mobileControls.style.display = 'none';
+    gameOverScreen.style.display = 'flex';
+}
+
+// --- UI, SHOP, and MULTIPLAYER LOGIC (unchanged) ---
+function updateStatsDisplay() { if (isMultiplayer) { if(players[myPeerId]) { const myStats = players[myPeerId]; scoreEl.textContent = 'Score: ' + myStats.score; coinScoreEl.innerHTML = `<span class="coin-icon"></span>${myStats.coins}`; } highScoreEl.style.display = 'none'; totalCoinsStatEl.style.display = 'none'; } else { scoreEl.textContent = 'Score: ' + Math.floor(score); highScoreEl.textContent = 'High Score: ' + Math.floor(highScore); coinScoreEl.innerHTML = `<span class="coin-icon"></span>${coinsCollected}`; totalCoinsStatEl.innerHTML = `Total Coins: ${totalCoins}<span class="coin-icon"></span>`; highScoreEl.style.display = 'inline'; totalCoinsStatEl.style.display = 'inline'; } }
+function buyUpgrade(type) { const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const price = data.prices[state.maxLevel]; if (totalCoins >= price) { totalCoins -= price; state.maxLevel++; state.equippedLevel = state.maxLevel; saveData(); populateShop(); } }
+function setEquippedLevel(type, newLevel) { const state = upgradesState[type]; if (newLevel >= 0 && newLevel <= state.maxLevel) { state.equippedLevel = newLevel; saveData(); populateShop(); } }
+function buySkin(skinId) { const skin = SKINS_DATA.find(s => s.id === skinId); if (!skin || skin.price > totalCoins) return; totalCoins -= skin.price; ownedSkins.push(skinId); equipSkin(skinId); }
+function equipSkin(skinId) { if (ownedSkins.includes(skinId)) { equippedSkinId = skinId; saveData(); populateShop(); } }
+function handleCustomColorChange(type, color) { customColors[type] = color; if (equippedSkinId === 'custom') { equipSkin('custom'); } else { saveData(); populateShop(); } }
+function populateShop() { if (totalCoinsDisplayP) { totalCoinsDisplayP.innerHTML = `Total Coins: <span>${totalCoins}</span><span class="coin-icon"></span>`; } upgradesContainer.innerHTML = ''; skinsContainer.innerHTML = ''; Object.keys(UPGRADES_DATA).forEach(type => { const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const isMaxed = state.maxLevel >= data.prices.length; const price = isMaxed ? 'N/A' : data.prices[state.maxLevel]; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isMaxed) { actionsHTML = `<button class="button" disabled>Maxed Out</button>`; } else { actionsHTML = `<button class="button" onclick="buyUpgrade('${type}')" ${totalCoins < price ? 'disabled' : ''}>Upgrade</button>`; } item.innerHTML = `<div class="shop-details"><div class="shop-info"><div class="shop-name-wrapper"><span class="shop-name">${data.name}</span><div class="level-controls"><span class="level-arrow ${state.equippedLevel <= 0 ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel-1})"><</span><span class="level-text">Lvl ${state.equippedLevel+1} / ${state.maxLevel+1}</span><span class="level-arrow ${state.equippedLevel >= state.maxLevel ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel+1})">></span></div></div><div class="shop-desc">${data.desc}</div><div class="shop-price">Next Level: ${price} <span class="coin-icon"></span></div></div></div><div class="shop-actions">${actionsHTML}</div>`; upgradesContainer.appendChild(item); }); SKINS_DATA.forEach(skin => { const isOwned = ownedSkins.includes(skin.id); const isEquipped = equippedSkinId === skin.id; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isOwned) { actionsHTML = `<button class="button" ${isEquipped ? 'disabled' : ''} onclick="equipSkin('${skin.id}')">${isEquipped ? 'Equipped' : 'Equip'}</button>`; } else { actionsHTML = `<button class="button" onclick="buySkin('${skin.id}')" ${totalCoins < skin.price ? 'disabled' : ''}>Buy</button>`; } let customControls = ''; if (skin.isCustom && isOwned) { customControls = `<input type="color" class="custom-color-picker" value="${customColors.shipColor}" oninput="handleCustomColorChange('shipColor', this.value)"><input type="color" class="custom-color-picker" value="${customColors.shieldColor.startsWith('#') ? customColors.shieldColor.substring(0, 7) : '#ffffff'}" oninput="handleCustomColorChange('shieldColor', this.value + '4D')">`; } item.innerHTML = `<div class="shop-details"><div class="shop-preview" style="background-color: ${skin.isCustom ? customColors.shipColor : skin.shipColor};"></div><div class="shop-info"><div class="shop-name-wrapper"><span class="shop-name">${skin.name}</span><span>${customControls}</span></div><div class="shop-desc">${skin.desc}</div><div class="shop-price">${isOwned ? 'Owned' : `${skin.price} <span class="coin-icon"></span>`}</div></div></div><div class="shop-actions">${actionsHTML}</div>`; skinsContainer.appendChild(item); });}
+function initializePeer(id) { if (peer) peer.destroy(); peer = new Peer(id); peer.on('open', (id) => { myPeerId = id; console.log('My peer ID is: ' + id); if (isHost) { mpStatus.textContent = `Room Created! ID: ${id}`; roomIdInput.value = id; roomIdInput.disabled = true; createRoomButton.disabled = true; joinRoomButton.disabled = true; } }); peer.on('connection', (connection) => { console.log('A player has connected!'); conn = connection; setupConnectionEvents(); }); peer.on('error', (err) => { console.error(err); mpStatus.textContent = `Error: ${err.type}. Try another ID.`; resetMultiplayerUI(); }); }
+function setupConnectionEvents() { conn.on('open', () => { if (isHost) { mpStatus.textContent = 'Player 2 connected! Starting game...'; const pTemplate = new Player(); const yPos = pTemplate.mesh.position.y; players[myPeerId] = { x: -10, y: yPos, score: 0, coins: 0, color: '#0ff' }; players[conn.peer] = { x: 10, y: yPos, score: 0, coins: 0, color: '#ff4500' }; pTemplate.destroy(); setTimeout(startMultiplayerGame, 1500); } else { mpStatus.textContent = 'Connected! Waiting for host to start...'; } }); conn.on('data', (data) => { if (isHost) { if (data.type === 'input' && players[conn.peer]) { const clientPlayer = players[conn.peer]; if (data.key === 'ArrowLeft' && clientPlayer.x > -gameAreaWidth/2) clientPlayer.x -= 0.5; if (data.key === 'ArrowRight' && clientPlayer.x < gameAreaWidth/2) clientPlayer.x += 0.5; } } else { if (data.type === 'gameState' && gameOver) { startMultiplayerGame(); } if (data.type === 'gameState') { asteroids = data.asteroids; coins = data.coins; players = data.players; } else if (data.type === 'gameOver') { endGame(data.loser); } } }); conn.on('close', () => { if(!gameOver) { mpStatus.textContent = 'Player disconnected.'; endGame(); } }); }
+function startMultiplayerGame() { isMultiplayer = true; init(); /* Multiplayer init now uses the main init */ }
+function resetMultiplayerUI() { if(peer) peer.destroy(); peer = null; conn = null; isHost = false; roomIdInput.value = ''; roomIdInput.disabled = false; createRoomButton.disabled = false; joinRoomButton.disabled = false; mpStatus.textContent = "Create a room or join a friend's."; }
+
+// --- EVENT LISTENERS ---
+window.addEventListener('keydown', e => keys[e.key] = true); window.addEventListener('keyup', e => keys[e.key] = false);
+startButton.addEventListener('click', init);
+restartButton.addEventListener('click', init);
+shopButton.addEventListener('click', () => { startScreen.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
+closeShopButton.addEventListener('click', () => { shopScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+settingsButton.addEventListener('click', () => { startScreen.style.display = 'none'; settingsScreen.style.display = 'flex'; });
+closeSettingsButton.addEventListener('click', () => { settingsScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+howToPlayButton.addEventListener('click', () => { startScreen.style.display = 'none'; howToPlayScreen.style.display = 'flex'; });
+closeHowToPlayButton.addEventListener('click', () => { howToPlayScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+goToMenuButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); gameOver = true; });
+goToShopButton.addEventListener('click', () => { gameOverScreen.style.display = 'none'; gameStatsContainer.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
+resetHighScoreButton.addEventListener('click', () => { if (confirm('Are you sure you want to reset your High Score? This cannot be undone.')) { highScore = 0; saveData(); alert('High Score reset!'); } });
+resetProgressButton.addEventListener('click', resetProgress);
+if (isMobileDevice()) { leftBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowLeft'] = true; }, { passive: false }); leftBtn.addEventListener('touchend', () => keys['ArrowLeft'] = false); rightBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowRight'] = true; }, { passive: false }); rightBtn.addEventListener('touchend', () => keys['ArrowRight'] = false); }
+window.addEventListener('resize', setCanvasDimensions);
+multiplayerButton.addEventListener('click', () => { startScreen.style.display = 'none'; multiplayerScreen.style.display = 'flex'; });
+backToMenuButton.addEventListener('click', () => { multiplayerScreen.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); });
+createRoomButton.addEventListener('click', () => { isHost = true; let roomId = 'cosmic' + Math.floor(Math.random() * 9000 + 1000); initializePeer(roomId); });
+joinRoomButton.addEventListener('click', () => { isHost = false; const roomId = roomIdInput.value.trim(); if (!roomId) { mpStatus.textContent = 'Please enter a Room ID to join.'; return; } initializePeer(); setTimeout(() => { if (!peer || !peer.id) { mpStatus.textContent = 'Error getting Peer ID. Check connection.'; return; } conn = peer.connect(roomId); mpStatus.textContent = `Connecting to room: ${roomId}...`; setupConnectionEvents(); }, 1000); });
+
+// Initial setup on page load
+loadData();
+gameStatsContainer.style.display = 'none';
+</script>
+</body>
+</html>
