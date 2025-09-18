@@ -1,7 +1,7 @@
 /* style-sub1.css — Skinfinder-specific styles (keeps homepage look) */
 
 body {
-  background-image: url(MCBETools/images/Minecraft.jpg);
+  background-image: url(/images/Minecraft.jpg);
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-size: cover;
@@ -10,7 +10,7 @@ body {
 #finder-card {
   max-width: 760px;
   margin: 12px auto 40px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.30);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
