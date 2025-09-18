@@ -1,25 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Texture Info | MCBE Tools</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles/style-sub1.css">
+  <meta charset="utf-8" />
+  <title>Texture Info | MCBE Tools</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- same font and base as your homepage -->
+  <link rel="stylesheet" media="screen" href="https://fontlibrary.org//face/minecraftia" type="text/css"/>
+  <base href="/MCBETools/" />
+
+  <!-- homepage styles first, then page-specific overrides -->
+  <link rel="stylesheet" href="styles/style.css" />
+  <link rel="stylesheet" href="styles/style-sub1.css" />
 </head>
 <body>
-    <div id="Transparent" class="center">
-    <img src="images/Logo.png" alt="">
-        <input type="text"  id="gamertag" name="Gamertag" placeholder="Enter Gamertag">
-        <button type="submit"  id="submitBtn">Submit</button>
-        <p>Make sure you have opened a server.
-            Suggested server is a geysermc server
-            test.geysermc.org
-        </p>
-        <a href="https://github.com/Procopio28/Procopio28.github.io">Visit our our GitHub repository</a>
+  <img src="images/Logo.png" alt="MCBE Tools Logo" />
+
+  <main id="finder-card" role="main" aria-labelledby="finder-title">
+    <h2 id="finder-title" style="display:none;">Texture Info / Skinfinder</h2>
+
+    <div id="finder-inner">
+      <input id="gamertag" name="gamertag" type="text"
+             placeholder="Enter Gamertag" autocomplete="off" aria-label="Gamertag" />
+
+      <div class="button-row">
+        <button id="submitBtn" type="button">Get Texture</button>
+
+        <!-- keep the same homepage navigation style -->
         <form action="./">
-            <button type="submit">Homepage</button>
+          <button type="submit">Homepage</button>
+        </form>
+
+        <form action="https://github.com/Procopio28/Procopio28.github.io" target="_blank" rel="noopener">
+          <button type="submit">Github</button>
         </form>
       </div>
-    <div id="result"></div>
-    <script src="scripts/script.js"></script>
+
+      <p class="hint">
+        Make sure you have opened a server.<br/>
+        Suggested server is a geysermc server: <code>test.geysermc.org</code>
+      </p>
+    </div>
+
+    <div id="result" aria-live="polite"></div>
+  </main>
+
+  <script src="scripts/script.js"></script>
 </body>
 </html>

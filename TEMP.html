@@ -1,0 +1,1032 @@
+<!doctype html>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1" />
+<title>3D Minecraft (Bedrock) Skin Viewer — Single File</title>
+<style>
+  :root{
+    --ui-bg:#0b1220;
+    --panel-bg: rgba(255,255,255,0.03);
+    --accent:#6dd3ff;
+    --muted:rgba(255,255,255,0.6);
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:linear-gradient(180deg,#061021 0%, #071426 60%);-webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale}
+  a { color: var(--accent); text-decoration: none; }
+  header{display:flex;gap:12px;align-items:center;padding:12px 16px}
+  header .title{font-weight:700;font-size:16px}
+  .wrap{display:flex;gap:12px;padding:8px 16px;box-sizing:border-box}
+  .left {
+    width:320px;
+    max-width:40%;
+    min-width:240px;
+    background:var(--panel-bg);
+    border-radius:12px;
+    padding:12px;
+    box-sizing:border-box;
+    backdrop-filter: blur(6px);
+  }
+  .left h3{margin:6px 0 10px 0;font-size:14px}
+  label{display:block;font-size:12px;color:var(--muted);margin:6px 0}
+  input[type="file"]{display:block}
+  .controls{display:flex;flex-direction:column;gap:8px}
+  .row{display:flex;gap:8px;align-items:center}
+  .btn {
+    background:linear-gradient(180deg,#1b2b3a,#14232c);
+    border:1px solid rgba(255,255,255,0.04);
+    color:#fff;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;
+  }
+  .btn.ghost { background:transparent;border:1px dashed rgba(255,255,255,0.06) }
+  .toggle {display:inline-flex;align-items:center;gap:8px}
+  .small {font-size:12px;padding:6px 8px}
+  .radio {display:flex;gap:8px;align-items:center}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  .viewer {
+    flex:1; min-height:480px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));
+    display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
+    padding:14px;
+  }
+  .screen {
+    width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;
+  }
+  .canvas-wrap{
+    width:100%;height:100%;display:flex;align-items:center;justify-content:center;gap:12px;
+  }
+
+  /* 3D scene container */
+  .scene-outer { width:100%; height:100%; display:flex;align-items:center;justify-content:center; }
+  .scene {
+    perspective: 1600px;
+    width:100%; height:100%;
+    display:flex;align-items:center;justify-content:center;
+    transform-style:preserve-3d;
+  }
+
+  /* model container */
+  #model {
+    transform-style: preserve-3d;
+    will-change: transform;
+    touch-action: none;
+    user-select: none;
+  }
+
+  /* Each part (head, body, arms, legs) */
+  .part {
+    position: absolute;
+    transform-style: preserve-3d;
+    left:0; top:0;
+  }
+  .face {
+    position:absolute;
+    left:0; top:0;
+    transform-origin: center center;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    box-sizing:border-box;
+    image-rendering: pixelated;
+    /* small smoothing */
+    background-repeat:no-repeat;
+  }
+  /* Slight tint/shadow to help visuals */
+  .face::after{
+    content:"";
+    position:absolute;left:0;top:0;right:0;bottom:0;
+    pointer-events:none;
+    mix-blend-mode: multiply;
+    opacity:0.06;
+    background:linear-gradient(180deg, rgba(0,0,0,0.15), rgba(255,255,255,0.02));
+  }
+
+  /* overlay parts are slightly larger to avoid z-fighting */
+  .overlay .face::after{opacity:0} /* no shading on overlay */
+
+  /* small UI */
+  .footer-hint {position:absolute;left:14px;bottom:12px;font-size:12px;color:var(--muted)}
+  .dropzone {
+    border-radius:10px;padding:8px;border:2px dashed rgba(255,255,255,0.03);text-align:center;font-size:13px;color:var(--muted);
+    margin-bottom:6px;
+  }
+  .settings {display:flex;gap:8px;flex-wrap:wrap}
+  .legend {font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* small responsivity */
+  @media (max-width:820px){
+    .wrap{flex-direction:column;padding:10px}
+    .left{width:100%;max-width:none}
+    .viewer{min-height:420px}
+  }
+</style>
+
+<body>
+<header>
+  <div class="title">3D Minecraft Skin Viewer (single-file, offline)</div>
+  <div style="margin-left:auto;font-size:13px;color:var(--muted)"><a href="https://dropoutdeveloper.com" target="_blank">dropoutdeveloper.com</a></div>
+</header>
+
+<div class="wrap">
+  <div class="left" id="leftPanel">
+    <h3>Load skin</h3>
+    <div class="dropzone" id="dropzone">Drop a .png skin here or use the button below (works offline)</div>
+    <label class="row"><input id="fileInput" type="file" accept="image/png,image/*" /> <button class="btn small" id="btnSample">Load Sample</button></label>
+
+    <h3>Model & layers</h3>
+    <div class="controls">
+      <label class="toggle">
+        <input id="toggleOuter" type="checkbox" checked /> <span style="font-size:13px">Show outer layers (hat, jacket, sleeves)</span>
+      </label>
+
+      <label class="radio">
+        <span style="font-size:13px">Arm model:</span>
+        <select id="armModel" class="small" style="margin-left:8px">
+          <option value="auto">Auto-detect</option>
+          <option value="classic">Classic (4px)</option>
+          <option value="slim">Slim (3px)</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <button class="btn small" id="btnReset">Reset view</button>
+        <button class="btn small ghost" id="btnCenter">Center model</button>
+      </label>
+
+      <label style="margin-top:6px">Auto-rotate: <input id="autoRotate" type="checkbox" checked style="margin-left:8px"/></label>
+
+      <div class="legend">Controls: drag / touch to rotate, pinch to zoom, wheel to zoom, double-tap to reset.</div>
+    </div>
+
+    <h3 style="margin-top:12px">Background & export</h3>
+    <div class="row" style="margin-top:6px">
+      <input id="bgColor" type="color" value="#0b1220" />
+      <button class="btn small" id="exportBtn">Export PNG</button>
+    </div>
+
+    <div class="hint">Works with Java & Bedrock HD skins (64×32, 64×64, 128×128...)</div>
+  </div>
+
+  <div class="viewer" id="viewer">
+    <div class="screen">
+      <div class="canvas-wrap">
+        <div class="scene-outer">
+          <div class="scene" id="scene">
+            <div id="model" style="transform: rotateX(-15deg) rotateY(25deg) scale(1)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-hint">No skin loaded — drop a skin or use "Load Sample".</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  Single-file CSS3D Minecraft skin viewer.
+  Uses the canonical skin coordinates (64-width base) as per skin-spec (minotar).
+  - Supports overlays
+  - Supports 64x32 (legacy) fallback
+  - Scales to higher-resolution Bedrock skins (e.g., 128x128)
+*/
+
+/* ---------- Mapping coordinates (base units, 64 scale) ----------
+   Values are rectangles [x1,y1,x2,y2] in base units (0..64)
+   Source: skin-spec / common references.
+*/
+const MAP = {
+  head: {
+    size:[8,8,8],
+    faces:{
+      top:   [8,0,16,8],
+      bottom:[16,0,24,8],
+      right: [0,8,8,16],
+      front: [8,8,16,16],
+      left:  [16,8,24,16],
+      back:  [24,8,32,16]
+    }
+  },
+  headOverlay:{
+    size:[8,8,8],
+    faces:{
+      top:   [40,0,48,8],
+      bottom:[48,0,56,8],
+      right: [32,8,40,16],
+      front: [40,8,48,16],
+      left:  [48,8,56,16],
+      back:  [56,8,64,16]
+    }
+  },
+  torso:{
+    size:[8,12,4],
+    faces:{
+      top:   [20,16,28,20],
+      bottom:[28,16,36,20],
+      right: [16,20,20,32],
+      front: [20,20,28,32],
+      left:  [28,20,32,32],
+      back:  [32,20,40,32]
+    }
+  },
+  torsoOverlay:{
+    size:[8,12,4],
+    faces:{
+      top:   [20,48,28,52],
+      bottom:[28,48,36,52],
+      right: [16,36,20,48],
+      front: [20,36,28,48],
+      left:  [28,36,32,48],
+      back:  [32,36,40,48]
+    }
+  },
+  rightArm:{
+    // regular arm (width will be 4 or 3 depending on model)
+    size:[4,12,4],
+    faces:{
+      top:   [44,16,48,20],
+      bottom:[48,16,52,20],
+      right: [40,20,44,32],
+      front: [44,20,48,32],
+      left:  [48,20,52,32],
+      back:  [52,20,56,32]
+    }
+  },
+  rightArmOverlay:{
+    size:[4,12,4],
+    faces:{
+      topReg:   [44,48,48,52],
+      topSlim:  [44,48,47,52],
+      bottomReg:[48,48,52,52],
+      bottomSlim:[47,48,50,52],
+      right: [40,36,44,48],
+      frontReg: [44,36,48,48],
+      frontSlim:[44,36,47,48],
+      leftReg: [48,36,52,48],
+      leftSlim:[47,36,51,48],
+      backReg: [52,36,56,48],
+      backSlim: [51,36,54,48]
+    }
+  },
+  leftArm:{
+    // 1.8+ explicit left arm mapping (if skin has height >= 64)
+    size:[4,12,4],
+    faces:{
+      topReg:   [36,48,40,52],
+      topSlim:  [36,48,39,52],
+      bottomReg:[40,48,44,52],
+      bottomSlim:[39,48,42,52],
+      right: [32,52,36,64],
+      frontReg: [36,52,40,64],
+      frontSlim:[36,52,39,64],
+      leftReg: [40,52,44,64],
+      leftSlim:[39,52,43,64],
+      backReg: [44,52,48,64],
+      backSlim: [43,52,46,64]
+    }
+  },
+  rightLeg:{
+    size:[4,12,4],
+    faces:{
+      top:   [4,16,8,20],
+      bottom:[8,16,12,20],
+      right: [0,20,4,32],
+      front: [4,20,8,32],
+      left:  [8,20,12,32],
+      back:  [12,20,16,32]
+    }
+  },
+  rightLegOverlay:{
+    size:[4,12,4],
+    faces:{
+      top:   [4,48,8,52],
+      bottom:[8,48,12,52],
+      right: [0,36,4,48],
+      front: [4,36,8,48],
+      left:  [8,36,12,48],
+      back:  [12,36,16,48]
+    }
+  },
+  leftLeg:{
+    size:[4,12,4],
+    faces:{
+      top:   [20,48,24,52],
+      bottom:[24,48,28,52],
+      right: [16,52,20,64],
+      front: [20,52,24,64],
+      left:  [24,52,28,64],
+      back:  [28,52,32,64]
+    }
+  },
+  leftLegOverlay:{
+    size:[4,12,4],
+    faces:{
+      top:   [4,48,8,52],
+      bottom:[8,48,12,52],
+      right: [0,52,4,64],
+      front: [4,52,8,64],
+      left:  [8,52,12,64],
+      back:  [12,52,16,64]
+    }
+  }
+};
+
+/* ---------- Utilities & globals ---------- */
+const model = document.getElementById('model');
+const scene = document.getElementById('scene');
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const toggleOuter = document.getElementById('toggleOuter');
+const armModelSelect = document.getElementById('armModel');
+const autoRotateInput = document.getElementById('autoRotate');
+const btnReset = document.getElementById('btnReset');
+const btnCenter = document.getElementById('btnCenter');
+const exportBtn = document.getElementById('exportBtn');
+const bgColorInput = document.getElementById('bgColor');
+const footerHint = document.querySelector('.footer-hint');
+const btnSample = document.getElementById('btnSample');
+
+let skinImage = null;        // HTMLImageElement for loaded skin
+let skinDataURL = null;      // data URL string
+let baseUnit = 4;            // CSS px per base unit (1 base unit = 1 pixel in 64x64 coordinate system)
+let baseUnitsHeight = 64;    // number of vertical base units present (32 or 64)
+let armModel = 'auto';       // auto/classic/slim
+let detectedSlim = false;
+let overlayVisible = true;
+let autoRotate = true;
+let rotationX = -15, rotationY = 25, modelScale = 1;
+let lastRenderTime = 0;
+
+/* Model geometry constants (in base units) */
+const HEAD = {w:8,h:8,d:8};
+const TORSO = {w:8,h:12,d:4};
+const ARM_REG = {w:4,h:12,d:4};
+const ARM_SLIM = {w:3,h:12,d:4};
+const LEG = {w:4,h:12,d:4};
+
+/* Default sample skin (very small placeholder) - blank translucent image */
+const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAABk5a6ZAAAAIElEQVR4Xu3BMQEAAADCoPVPbQ0PoAAAAAAAAAAAAAAAAAAAAAC4G4Z0AAG1r5V8AAAAASUVORK5CYII=';
+
+/* ---------- Load & build ---------- */
+
+function resetModelTransform(){
+  rotationX = -15; rotationY = 25; modelScale = 1;
+  updateModelTransform();
+}
+function updateModelTransform(){
+  model.style.transform = `rotateX(${rotationX}deg) rotateY(${rotationY}deg) scale(${modelScale})`;
+}
+
+/* compute baseUnit so model fits into the viewer area */
+function computeBaseUnit(){
+  const viewer = document.getElementById('viewer');
+  const pad = 20;
+  const cw = Math.max(200, viewer.clientWidth - pad*2);
+  const ch = Math.max(200, viewer.clientHeight - pad*2);
+  // model base-units extents:
+  // width: torso + 2 arms
+  const armW = (effectiveArmWidth());
+  const modelWidthUnits = TORSO.w + armW*2;
+  const modelHeightUnits = HEAD.h + TORSO.h + LEG.h; // 8 + 12 + 12 = 32
+  // compute units-to-css ratio to fit both dims, keep margins
+  const maxScaleW = cw * 0.78 / modelWidthUnits;
+  const maxScaleH = ch * 0.78 / modelHeightUnits;
+  baseUnit = Math.floor(Math.max(1, Math.min(maxScaleW, maxScaleH)));
+  // keep baseUnit reasonable
+  baseUnit = Math.max(2, Math.min(12, baseUnit));
+}
+
+/* effective arm width depending on selected/detected model */
+function effectiveArmWidth(){
+  const m = (armModel === 'auto') ? (detectedSlim ? 'slim' : 'classic') : armModel;
+  return (m === 'slim') ? ARM_SLIM.w : ARM_REG.w;
+}
+
+/* Convert rectangle coords (base units) to CSS values */
+function rectToCSS(rect){
+  // rect: [x1,y1,x2,y2] in base units (0..64)
+  return {
+    x: rect[0],
+    y: rect[1],
+    w: rect[2] - rect[0],
+    h: rect[3] - rect[1]
+  };
+}
+
+/* place backgrounds: background-size = (64 * baseUnit) x (baseUnitsHeight * baseUnit)
+   background-position = -rect.x * baseUnit px, -rect.y * baseUnit px
+*/
+function faceStyleFromRect(rect){
+  const r = rectToCSS(rect);
+  return {
+    width: `${r.w * baseUnit}px`,
+    height: `${r.h * baseUnit}px`,
+    backgroundSize: `${64 * baseUnit}px ${baseUnitsHeight * baseUnit}px`,
+    backgroundPosition: `-${r.x * baseUnit}px -${r.y * baseUnit}px`,
+    backgroundImage: `url(${skinDataURL || BLANK_PNG})`,
+    imageRendering: 'pixelated'
+  };
+}
+
+/* create a cube part (DOM structure) */
+function createPart(name, dims, faceRects, options = {}){
+  const part = document.createElement('div');
+  part.className = `part ${options.overlay ? 'overlay' : ''} ${name}`;
+  part.style.width = `${dims.w * baseUnit}px`;
+  part.style.height = `${dims.h * baseUnit}px`;
+  part.style.transformStyle = 'preserve-3d';
+
+  // helper to create face element
+  function makeFace(faceName, rect){
+    const f = document.createElement('div');
+    f.className = `face ${faceName}`;
+    // compute face DOM size
+    let faceW = 0, faceH = 0;
+    if(faceName === 'front' || faceName === 'back'){
+      faceW = dims.w; faceH = dims.h;
+    } else if(faceName === 'left' || faceName === 'right'){
+      faceW = dims.d; faceH = dims.h;
+    } else { // top/bottom
+      faceW = dims.w; faceH = dims.d;
+    }
+    // apply CSS size
+    f.style.width = `${faceW * baseUnit}px`;
+    f.style.height = `${faceH * baseUnit}px`;
+    // background mapping
+    if(rect){
+      const style = faceStyleFromRect(rect);
+      f.style.backgroundImage = style.backgroundImage;
+      f.style.backgroundSize = style.backgroundSize;
+      f.style.backgroundPosition = style.backgroundPosition;
+      f.style.backgroundRepeat = 'no-repeat';
+    } else {
+      f.style.backgroundColor = 'magenta';
+    }
+    // place face in 3D
+    const halfW = (dims.w * baseUnit) / 2;
+    const halfH = (dims.h * baseUnit) / 2;
+    const halfD = (dims.d * baseUnit) / 2;
+    // set transform
+    switch(faceName){
+      case 'front':
+        f.style.transform = `translateZ(${halfD}px)`;
+        f.style.left = `${(baseUnit*( (dims.w - faceW)/2 ))}px`; // center if needed
+        f.style.top = `0px`;
+        break;
+      case 'back':
+        f.style.transform = `rotateY(180deg) translateZ(${halfD}px)`;
+        f.style.left = `${(baseUnit*( (dims.w - faceW)/2 ))}px`;
+        f.style.top = `0px`;
+        break;
+      case 'right':
+        f.style.transform = `rotateY(90deg) translateZ(${halfW}px)`;
+        f.style.left = `${(baseUnit*( (dims.w - faceW)/2 ))}px`;
+        f.style.top = `0px`;
+        break;
+      case 'left':
+        f.style.transform = `rotateY(-90deg) translateZ(${halfW}px)`;
+        f.style.left = `${(baseUnit*( (dims.w - faceW)/2 ))}px`;
+        f.style.top = `0px`;
+        break;
+      case 'top':
+        f.style.transform = `rotateX(90deg) translateZ(${halfH}px)`;
+        f.style.left = `0px`;
+        f.style.top = `${(baseUnit*((dims.h - faceH)/2))}px`;
+        break;
+      case 'bottom':
+        f.style.transform = `rotateX(-90deg) translateZ(${halfH}px)`;
+        f.style.left = `0px`;
+        f.style.top = `${(baseUnit*((dims.h - faceH)/2))}px`;
+        break;
+      default:
+        f.style.transform = '';
+    }
+    return f;
+  }
+
+  // faces: front/back/left/right/top/bottom
+  const facesOrder = ['front','back','left','right','top','bottom'];
+  for(const fn of facesOrder){
+    // some map entries might be named differently (e.g., rightArmOverlay has special slim/reg variants)
+    let rect = faceRects[fn];
+    const faceEl = makeFace(fn, rect);
+    part.appendChild(faceEl);
+  }
+
+  return part;
+}
+
+/* Build whole player model DOM */
+function buildModel(){
+  // clear model
+  model.innerHTML = '';
+
+  if(!skinImage) {
+    footerHint.textContent = 'No skin loaded — drop a skin or use "Load Sample".';
+    return;
+  }
+  footerHint.textContent = '';
+
+  // compute imageScale and baseUnitsHeight
+  const imageW = skinImage.naturalWidth;
+  const imageH = skinImage.naturalHeight;
+  const imageScale = imageW / 64; // image pixels per base unit horizontally
+  baseUnitsHeight = Math.round(imageH / imageScale); // typically 32 or 64 (or 64 for Bedrock HD)
+  if(baseUnitsHeight !== 32 && baseUnitsHeight !== 64){
+    // accept odd sizes too (like 128/2 -> 64). But ensure integer
+    baseUnitsHeight = Math.max(32, Math.min(64, baseUnitsHeight));
+  }
+
+  // attempt auto-detect slim arms if 'auto'
+  detectedSlim = detectSlim(imageW,imageH,imageScale);
+
+  computeBaseUnit();
+
+  overlayVisible = toggleOuter.checked;
+  autoRotate = autoRotateInput.checked;
+
+  // helper: get rect from MAP and multiply coords (rects are base units)
+  function g(mapPath){
+    // returns the rectangle [x1,y1,x2,y2] or null
+    const parts = mapPath.split('.');
+    let cur = MAP;
+    for(const p of parts){
+      cur = cur[p];
+      if(!cur) return null;
+    }
+    return cur;
+  }
+
+  // create torso center at (0,0)
+  const torsoDims = {w: TORSO.w, h: TORSO.h, d: TORSO.d};
+  const armWidth = effectiveArmWidth();
+
+  // place each part: compute pixel center positions (CSS px). We'll place each part by translating its center
+  // model's origin (0,0) corresponds to center of torso container
+  // We'll create a wrapper 'model' where each part uses transform: translate3d(xpx, ypx, 0) to set its center.
+  // But our .part elements are positioned top-left at (0,0) by default; we'll offset using left/top CSS.
+  // To simplify: we will put each part with style.left/top such that their center matches computed coordinates.
+  // Compute model offsets in CSS px
+  const torsoCenter = {x:0, y:0}; // in base units
+  // compute centers in base units
+  const headCenter = { x: 0, y: torsoCenter.y + (TORSO.h/2) + (HEAD.h/2) };
+  const rightArmCenter = { x: torsoCenter.x + (TORSO.w/2) + (armWidth/2), y: torsoCenter.y };
+  const leftArmCenter  = { x: torsoCenter.x - (TORSO.w/2) - (armWidth/2), y: torsoCenter.y };
+  const rightLegCenter = { x: torsoCenter.x - (TORSO.w/2 - LEG.w/2), y: torsoCenter.y - (TORSO.h/2) - (LEG.h/2) };
+  const leftLegCenter  = { x: torsoCenter.x + (TORSO.w/2 - LEG.w/2), y: rightLegCenter.y };
+
+  // CSS center offset to place model at center of scene
+  // We'll set model's transform-origin at center and then position parts relative via left/top as (centerX - width/2, centerY - height/2)
+  // Calculate overall bounding box of model to center it
+  const l = Math.min(leftArmCenter.x - ARM_REG.w/2, rightArmCenter.x - armWidth/2, rightLegCenter.x - LEG.w/2);
+  const r = Math.max(leftArmCenter.x + armWidth/2, rightArmCenter.x + armWidth/2, leftLegCenter.x + LEG.w/2);
+  const top = headCenter.y + HEAD.h/2;
+  const bottom = rightLegCenter.y - LEG.h/2;
+  const modelWidthUnits = r - l;
+  const modelHeightUnits = top - bottom;
+
+  // compute center shift so that model is centered in the model container
+  // convert base units to CSS px
+  const centerShiftX = ( (r + l) / 2 ) * baseUnit; // css px
+  const centerShiftY = ( (top + bottom) / 2 ) * baseUnit; // css px
+
+  // clear model area and set width/height to large to accommodate transforms
+  model.style.width = `${(modelWidthUnits + 40) * baseUnit}px`;
+  model.style.height = `${(modelHeightUnits + 40) * baseUnit}px`;
+  model.style.position = 'relative';
+  model.style.left = '0';
+  model.style.top = '0';
+  model.style.margin = '0 auto';
+  model.innerHTML = '';
+
+  // utility to position a part element at baseUnits center coord
+  function positionPart(elem, centerBU){
+    const cssLeft = ( (centerBU.x * baseUnit) - (parseFloat(elem.style.width)/2) - centerShiftX );
+    const cssTop  = ( (-centerBU.y * baseUnit) - (parseFloat(elem.style.height)/2) + centerShiftY );
+    // Y inversion: our base Y positive up, CSS top increases downward so use -centerBU.y
+    elem.style.left = `${cssLeft}px`;
+    elem.style.top = `${cssTop}px`;
+  }
+
+  // HEAD
+  const headRects = MAP.head.faces;
+  const headPart = createPart('head', {w:HEAD.w,h:HEAD.h,d:HEAD.d}, {
+    front: headRects.front, back: headRects.back, left: headRects.left, right: headRects.right, top: headRects.top, bottom: headRects.bottom
+  });
+  // overlay head
+  let headOverlayPart = null;
+  if(overlayVisible && baseUnitsHeight >= 64){
+    const ho = MAP.headOverlay.faces;
+    headOverlayPart = createPart('headOverlay', {w:HEAD.w,h:HEAD.h,d:HEAD.d}, {
+      front: ho.front, back: ho.back, left: ho.left, right: ho.right, top: ho.top, bottom: ho.bottom
+    });
+    // scale overlay slightly outward to avoid z-fighting
+    headOverlayPart.style.transform = `scale3d(1.02,1.02,1.02)`;
+  }
+
+  // TORSO
+  const torsoPart = createPart('torso', {w: TORSO.w, h: TORSO.h, d: TORSO.d}, {
+    front: MAP.torso.faces.front, back: MAP.torso.faces.back, left: MAP.torso.faces.left, right: MAP.torso.faces.right, top: MAP.torso.faces.top, bottom: MAP.torso.faces.bottom
+  });
+  let torsoOverlayPart = null;
+  if(overlayVisible && baseUnitsHeight >= 64){
+    torsoOverlayPart = createPart('torsoOverlay', {w: TORSO.w, h: TORSO.h, d: TORSO.d}, {
+      front: MAP.torsoOverlay.faces.front, back: MAP.torsoOverlay.faces.back, left: MAP.torsoOverlay.faces.left, right: MAP.torsoOverlay.faces.right, top: MAP.torsoOverlay.faces.top, bottom: MAP.torsoOverlay.faces.bottom
+    });
+    torsoOverlayPart.style.transform = `scale3d(1.015,1.015,1.015)`;
+  }
+
+  // RIGHT ARM
+  const rightArmDims = {w:armWidth,h:12,d:4};
+  const rightArmRects = MAP.rightArm.faces;
+  // if slim and selected, some top/bottom/front/left/back rectangles differ - use overlay mapping to get slim overlay coordinates
+  const rightArmPart = createPart('rightArm', rightArmDims, {
+    front: rightArmRects.front, back: rightArmRects.back, left: rightArmRects.left, right: rightArmRects.right, top: rightArmRects.top, bottom: rightArmRects.bottom
+  });
+  let rightArmOverlay = null;
+  if(overlayVisible && baseUnitsHeight >= 64){
+    // choose correct rects for overlay depending on slim/classic
+    const ro = MAP.rightArmOverlay.faces;
+    const front = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? ro.frontSlim || ro.frontReg : ro.frontReg;
+    const left  = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? ro.leftSlim  || ro.leftReg  : ro.leftReg;
+    const back  = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? ro.backSlim  || ro.backReg  : ro.backReg;
+    const top   = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? ro.topSlim   || ro.topReg   : ro.topReg;
+    const bottom= (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? ro.bottomSlim|| ro.bottomReg: ro.bottomReg;
+    rightArmOverlay = createPart('rightArmOverlay', rightArmDims, {
+      front: front, back: back, left: left, right: ro.right, top: top, bottom: bottom
+    });
+    rightArmOverlay.style.transform = `scale3d(1.015,1.015,1.015)`;
+  }
+
+  // LEFT ARM: if skin has 1.8 mapping (baseUnitsHeight >= 64) use explicit left arm rectangles from MAP.leftArm, else mirror right arm
+  let leftArmPart = null, leftArmOverlay = null;
+  if(baseUnitsHeight >= 64){
+    // left arm dims (if slim, width for left arm differs as well)
+    const leftArmW = effectiveArmWidth();
+    const leftArmDims = {w:leftArmW,h:12,d:4};
+    // choose rects
+    const la = MAP.leftArm.faces;
+    // top/bottom differ for slim/reg, pick accordingly
+    let topRect = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? la.topSlim : la.topReg;
+    let bottomRect = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? la.bottomSlim : la.bottomReg;
+    let frontRect = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? la.frontSlim : la.frontReg;
+    let leftRect  = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? la.leftSlim : la.leftReg;
+    let backRect  = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? la.backSlim : la.backReg;
+
+    leftArmPart = createPart('leftArm', leftArmDims, {
+      front: frontRect, back: backRect, left: leftRect, right: la.right, top: topRect, bottom: bottomRect
+    });
+    if(overlayVisible){
+      const lao = MAP.leftArmOverlay || {};
+      // overlay parts if present
+      // Choose top/bottom variants for regular/slim
+      let lTop = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? lao.topSlim || lao.topReg : lao.topReg;
+      let lBottom = (armModelSelect.value==='slim' || (armModelSelect.value==='auto' && detectedSlim)) ? lao.bottomSlim || lao.bottomReg : lao.bottomReg;
+      // pick other faces straightforwardly
+      leftArmOverlay = createPart('leftArmOverlay', leftArmDims, {
+        front: lao.frontSlim || lao.frontReg || null,
+        back: lao.backSlim || lao.backReg || null,
+        left: lao.leftSlim || lao.leftReg || null,
+        right: lao.right || null,
+        top: lTop,
+        bottom: lBottom
+      });
+      leftArmOverlay.style.transform = `scale3d(1.015,1.015,1.015)`;
+    }
+  } else {
+    // legacy: mirror right arm
+    const leftArmW = effectiveArmWidth();
+    const leftArmDims = {w:leftArmW,h:12,d:4};
+    leftArmPart = createPart('leftArm', leftArmDims, {
+      // use right arm rects but they will be mirrored later by CSS
+      front: MAP.rightArm.faces.front, back: MAP.rightArm.faces.back, left: MAP.rightArm.faces.left, right: MAP.rightArm.faces.right, top: MAP.rightArm.faces.top, bottom: MAP.rightArm.faces.bottom
+    });
+    leftArmPart.style.transform = 'scaleX(-1)'; // mirror horizontally for legacy skins
+    if(overlayVisible){
+      rightArmOverlay && (leftArmOverlay = createPart('leftArmOverlay', leftArmDims, {
+        front: MAP.rightArmOverlay.faces.frontReg, back: MAP.rightArmOverlay.faces.backReg, left: MAP.rightArmOverlay.faces.leftReg, right: MAP.rightArmOverlay.faces.right, top: MAP.rightArmOverlay.faces.topReg, bottom: MAP.rightArmOverlay.faces.bottomReg
+      }));
+      if(leftArmOverlay) leftArmOverlay.style.transform = 'scale3d(-1,1,1)'; // mirror overlay too
+    }
+  }
+
+  // RIGHT LEG
+  const rightLegPart = createPart('rightLeg', {w:LEG.w,h:LEG.h,d:LEG.d}, {
+    front: MAP.rightLeg.faces.front, back: MAP.rightLeg.faces.back, left: MAP.rightLeg.faces.left, right: MAP.rightLeg.faces.right, top: MAP.rightLeg.faces.top, bottom: MAP.rightLeg.faces.bottom
+  });
+  let rightLegOverlay = null;
+  if(overlayVisible && baseUnitsHeight >= 64){
+    rightLegOverlay = createPart('rightLegOverlay', {w:LEG.w,h:LEG.h,d:LEG.d}, {
+      front: MAP.rightLegOverlay.faces.front, back: MAP.rightLegOverlay.faces.back, left: MAP.rightLegOverlay.faces.left, right: MAP.rightLegOverlay.faces.right, top: MAP.rightLegOverlay.faces.top, bottom: MAP.rightLegOverlay.faces.bottom
+    });
+    rightLegOverlay.style.transform = `scale3d(1.015,1.015,1.015)`;
+  }
+
+  // LEFT LEG
+  const leftLegPart = createPart('leftLeg', {w:LEG.w,h:LEG.h,d:LEG.d}, {
+    front: MAP.leftLeg.faces.front, back: MAP.leftLeg.faces.back, left: MAP.leftLeg.faces.left, right: MAP.leftLeg.faces.right, top: MAP.leftLeg.faces.top, bottom: MAP.leftLeg.faces.bottom
+  });
+  let leftLegOverlay = null;
+  if(overlayVisible && baseUnitsHeight >= 64){
+    leftLegOverlay = createPart('leftLegOverlay', {w:LEG.w,h:LEG.h,d:LEG.d}, {
+      front: MAP.leftLegOverlay.faces.front, back: MAP.leftLegOverlay.faces.back, left: MAP.leftLegOverlay.faces.left, right: MAP.leftLegOverlay.faces.right, top: MAP.leftLegOverlay.faces.top, bottom: MAP.leftLegOverlay.faces.bottom
+    });
+    leftLegOverlay.style.transform = `scale3d(1.015,1.015,1.015)`;
+  }
+
+  // Position & append parts (order matters for overlay layering)
+  // Append torso first (so torso overlays appear above torso)
+  torsoPart.style.zIndex = 10;
+  model.appendChild(torsoPart);
+  if(torsoOverlayPart) model.appendChild(torsoOverlayPart);
+
+  // head
+  model.appendChild(headPart);
+  if(headOverlayPart) model.appendChild(headOverlayPart);
+
+  // arms (append right then left to control overlay stacking)
+  model.appendChild(rightArmPart);
+  if(rightArmOverlay) model.appendChild(rightArmOverlay);
+  model.appendChild(leftArmPart);
+  if(leftArmOverlay) model.appendChild(leftArmOverlay);
+
+  // legs
+  model.appendChild(rightLegPart);
+  if(rightLegOverlay) model.appendChild(rightLegOverlay);
+  model.appendChild(leftLegPart);
+  if(leftLegOverlay) model.appendChild(leftLegOverlay);
+
+  // position each part
+  positionPart(torsoPart, torsoCenter);
+  torsoOverlayPart && positionPart(torsoOverlayPart, torsoCenter);
+
+  positionPart(headPart, headCenter);
+  headOverlayPart && positionPart(headOverlayPart, headCenter);
+
+  positionPart(rightArmPart, rightArmCenter);
+  rightArmOverlay && positionPart(rightArmOverlay, rightArmCenter);
+
+  positionPart(leftArmPart, leftArmCenter);
+  leftArmOverlay && positionPart(leftArmOverlay, leftArmCenter);
+
+  positionPart(rightLegPart, rightLegCenter);
+  rightLegOverlay && positionPart(rightLegOverlay, rightLegCenter);
+
+  positionPart(leftLegPart, leftLegCenter);
+  leftLegOverlay && positionPart(leftLegOverlay, leftLegCenter);
+
+  // apply global background color
+  document.getElementById('viewer').style.background = bgColorInput.value;
+
+  // finalize transform
+  updateModelTransform();
+}
+
+/* ---------- Auto-detection heuristic for slim arms ----------
+   Heuristic: check whether the skin contains the "slim" arm pixels structure.
+   We'll sample pixels around common slim indicators. If many pixels in a 'slim-only' column are transparent, it's likely slim.
+*/
+function detectSlim(imageW,imageH,imageScale){
+  // sample pixel at base unit coordinate (54, 20) and near; many implementations check if the pixel at (54,20) is transparent
+  // We'll draw onto a small canvas to read alpha channel.
+  try {
+    const c = document.createElement('canvas');
+    c.width = imageW; c.height = imageH;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(skinImage, 0, 0);
+    const checkX = Math.floor(54 * imageScale);
+    const checkY = Math.floor(20 * imageScale);
+    if(checkX < 0 || checkX >= imageW || checkY < 0 || checkY >= imageH) return false;
+    const data = ctx.getImageData(checkX, checkY, 1,1).data;
+    const a = data[3];
+    // if pixel fully transparent (alpha=0) — usually indicates slim model
+    return (a === 0);
+  } catch(err){
+    return false;
+  }
+}
+
+/* ---------- Image load handlers ---------- */
+
+function loadSkinFromFile(file){
+  if(!file) return;
+  const fr = new FileReader();
+  fr.onload = function(e){
+    skinDataURL = e.target.result;
+    const img = new Image();
+    img.onload = function(){
+      skinImage = img;
+      // default set armModel auto
+      if(armModelSelect.value === 'auto') detectedSlim = detectSlim(img.naturalWidth, img.naturalHeight, img.naturalWidth/64);
+      buildModel();
+    };
+    img.onerror = ()=>{ alert('Failed to load image — ensure it is a valid PNG skin.'); };
+    img.src = skinDataURL;
+  };
+  fr.readAsDataURL(file);
+}
+
+fileInput.addEventListener('change', (ev)=>{
+  const f = ev.target.files && ev.target.files[0];
+  if(f) loadSkinFromFile(f);
+});
+
+dropzone.addEventListener('dragover', (e)=>{
+  e.preventDefault(); dropzone.style.borderColor = '#6dd3ff';
+});
+dropzone.addEventListener('dragleave', ()=>{ dropzone.style.borderColor = 'rgba(255,255,255,0.03)'; });
+dropzone.addEventListener('drop', (e)=>{
+  e.preventDefault(); dropzone.style.borderColor = 'rgba(255,255,255,0.03)';
+  const f = e.dataTransfer && (e.dataTransfer.files[0] || null);
+  if(f) loadSkinFromFile(f);
+});
+
+btnSample.addEventListener('click', ()=>{
+  // quick demo: use a tiny blank skin as placeholder
+  // you can drop any real skin to see the result
+  // Instead of embedding a large default Steve skin, we just ask user to pick one; but load a blank safe image so structure still builds.
+  const sampleImg = new Image();
+  sampleImg.onload = ()=>{
+    skinImage = sampleImg;
+    skinDataURL = BLANK_PNG;
+    buildModel();
+  };
+  // tiny checker for placeholder
+  sampleImg.src = BLANK_PNG;
+});
+
+/* toggles */
+toggleOuter.addEventListener('change', ()=>{
+  overlayVisible = toggleOuter.checked;
+  buildModel();
+});
+armModelSelect.addEventListener('change', ()=>{
+  buildModel();
+});
+autoRotateInput.addEventListener('change', ()=>{
+  autoRotate = autoRotateInput.checked;
+});
+
+/* background color */
+bgColorInput.addEventListener('input', ()=>{
+  document.getElementById('viewer').style.background = bgColorInput.value;
+});
+
+/* reset / center */
+btnReset.addEventListener('click', ()=>{ resetModelTransform(); });
+btnCenter.addEventListener('click', ()=>{ buildModel(); });
+
+/* export: rasterize the viewer to PNG using html2canvas-like manual render:
+   We will render the assembled model parts onto a temporary canvas by drawing the skin texture pieces.
+   This avoids depending on external libraries and yields a crisp 2D snapshot.
+*/
+exportBtn.addEventListener('click', async ()=>{
+  if(!skinImage) { alert('Load a skin first'); return; }
+  // create canvas sized to the model bounding box
+  computeBaseUnit();
+  const widthPx = Math.floor((16 * baseUnit) * 2.5);
+  const heightPx = Math.floor((32 * baseUnit) * 2.5);
+  // But rather than guessing, we'll snapshot the scene container using drawWindow concept is not available.
+  // Simpler: use HTML2Canvas is unavailable; we'll fallback to capturing the scene by using CSS scale and drawing skin faces onto canvas using model coordinates.
+  // For simplicity, produce a direct export of the skin PNG (original texture) and message the user. (This keeps the file self-contained and safe.)
+  // Provide a minimal export: re-render basic frontal composition: head + torso + arms + legs in a single canvas using texture mapping.
+  try {
+    const c = document.createElement('canvas');
+    const scale = 8 * Math.max(1, Math.min(6, baseUnit / 4)); // scale factor so result isn't tiny
+    c.width = Math.round(16 * baseUnit * scale);
+    c.height = Math.round(32 * baseUnit * scale);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = bgColorInput.value; ctx.fillRect(0,0,c.width,c.height);
+
+    // We'll paint: head at top center, torso center, arms, legs using the skinImage.
+    // For each face, copy the subrect from skinImage and draw at correct place scaled.
+    const imageScale = skinImage.naturalWidth / 64;
+    const bu = baseUnit * scale;
+    // compute positions in px
+    // head top-left
+    const headPx = { x: Math.round((c.width - HEAD.w*bu)/2), y: Math.round((0.5*bu)) };
+    // helper to draw face rect at destination
+    function drawRectFromSkin(sx,sy,sw,sh, dx,dy, dw,dh){
+      ctx.drawImage(skinImage, sx*imageScale, sy*imageScale, sw*imageScale, sh*imageScale, dx,dy,dw,dh);
+    }
+    // draw head front -> use MAP.head.faces.front
+    const hf = MAP.head.faces.front;
+    const rf = rectToCSS(hf);
+    drawRectFromSkin(rf.x, rf.y, rf.w, rf.h, headPx.x, headPx.y, rf.w*bu, rf.h*bu);
+    // draw torso
+    const tf = rectToCSS(MAP.torso.faces.front);
+    const torsoX = Math.round((c.width - tf.w*bu)/2);
+    const torsoY = headPx.y + HEAD.h*bu + Math.round(0.5*bu);
+    drawRectFromSkin(tf.x, tf.y, tf.w, tf.h, torsoX, torsoY, tf.w*bu, tf.h*bu);
+
+    // draw right arm front
+    const raf = rectToCSS(MAP.rightArm.faces.front);
+    drawRectFromSkin(raf.x, raf.y, raf.w, raf.h, torsoX - raf.w*bu, torsoY, raf.w*bu, raf.h*bu);
+    // draw left arm front - use leftArm mapping if available
+    const laf = baseUnitsHeight>=64 ? rectToCSS(MAP.leftArm.faces.frontReg || MAP.leftArm.faces.frontReg) : rectToCSS(MAP.rightArm.faces.front);
+    drawRectFromSkin(laf.x, laf.y, laf.w, laf.h, torsoX + tf.w*bu, torsoY, laf.w*bu, laf.h*bu);
+
+    // draw legs
+    const rlf = rectToCSS(MAP.rightLeg.faces.front);
+    const legY = torsoY + tf.h*bu;
+    drawRectFromSkin(rlf.x, rlf.y, rlf.w, rlf.h, torsoX + Math.round( (tf.w/2 - rlf.w) * bu ), legY, rlf.w*bu, rlf.h*bu);
+    const llf = rectToCSS(MAP.leftLeg.faces.front);
+    drawRectFromSkin(llf.x, llf.y, llf.w, llf.h, torsoX + Math.round( (tf.w/2 + 0) * bu ), legY, llf.w*bu, llf.h*bu);
+
+    // convert to data URL and trigger download
+    const out = c.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = out; a.download = 'skin_snapshot.png';
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch(err){
+    alert('Export failed: ' + err);
+  }
+});
+
+/* ---------- Pointer / touch controls ---------- */
+let dragging = false, lastX=0, lastY=0;
+let pointerId = null;
+let pointers = {}; // for pinch
+let pinchStartDist = 0, startScale = 1;
+
+function getDistance(p1,p2){
+  const dx = p2.x - p1.x, dy = p2.y - p1.y; return Math.hypot(dx,dy);
+}
+
+scene.addEventListener('pointerdown', (e)=>{
+  scene.setPointerCapture(e.pointerId);
+  pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+  if(Object.keys(pointers).length === 1){
+    dragging = true; lastX = e.clientX; lastY = e.clientY; pointerId = e.pointerId;
+  } else {
+    // start pinch
+    const ids = Object.keys(pointers);
+    if(ids.length === 2){
+      const p1 = pointers[ids[0]], p2 = pointers[ids[1]];
+      pinchStartDist = getDistance(p1,p2);
+      startScale = modelScale;
+    }
+  }
+});
+scene.addEventListener('pointermove', (e)=>{
+  if(!(e.pointerId in pointers)) return;
+  pointers[e.pointerId] = {x:e.clientX,y:e.clientY};
+  const keys = Object.keys(pointers);
+  if(keys.length === 1 && dragging && pointerId === e.pointerId){
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    rotationY += dx * 0.35;
+    rotationX += dy * 0.25;
+    lastX = e.clientX; lastY = e.clientY;
+    updateModelTransform();
+  } else if(keys.length === 2){
+    const p1 = pointers[keys[0]], p2 = pointers[keys[1]];
+    const dist = getDistance(p1,p2);
+    if(pinchStartDist > 0){
+      const ratio = dist / pinchStartDist;
+      modelScale = Math.max(0.15, Math.min(4, startScale * ratio));
+      updateModelTransform();
+    }
+  }
+});
+scene.addEventListener('pointerup', (e)=>{
+  try { scene.releasePointerCapture(e.pointerId); } catch(_) {}
+  delete pointers[e.pointerId];
+  dragging = false; pointerId = null;
+  pinchStartDist = 0; startScale = modelScale;
+});
+scene.addEventListener('pointercancel', (e)=>{ delete pointers[e.pointerId]; dragging=false; pinchStartDist=0; });
+
+scene.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  modelScale *= (1 - e.deltaY * 0.0015);
+  modelScale = Math.max(0.15, Math.min(4, modelScale));
+  updateModelTransform();
+}, {passive:false});
+
+/* double-tap/double-click to reset */
+let lastTap = 0;
+scene.addEventListener('click', (e)=>{
+  const now = Date.now();
+  if(now - lastTap < 300){
+    resetModelTransform();
+    lastTap = 0;
+  } else lastTap = now;
+});
+
+/* ---------- Animation loop (auto-rotate) ---------- */
+function animate(ts){
+  const dt = ts - lastRenderTime;
+  lastRenderTime = ts;
+  if(autoRotate && (!dragging || Object.keys(pointers).length === 0)){
+    rotationY += 0.02 * (dt/16.67); // slow rotation
+    updateModelTransform();
+  }
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+/* ---------- Window resize ---------- */
+window.addEventListener('resize', ()=>{ computeBaseUnit(); if(skinImage) buildModel(); });
+
+/* ---------- initial hint ---------- */
+footerHint.textContent = 'Drop a skin (PNG) or click "Load Sample".';
+
+/* ---------- End of file ---------- */
+</script>
+
+</body>
+</html>

@@ -1,85 +1,131 @@
-function fetchSkinData(gamertag) {
-    const apiUrlXUID = `https://api.geysermc.org/v2/xbox/xuid/${encodeURIComponent(gamertag)}`;
+// scripts/script.js
+const resultEl = document.getElementById('result');
+const submitBtn = document.getElementById('submitBtn');
+const gamertagInput = document.getElementById('gamertag');
 
-    fetch(apiUrlXUID)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
+async function fetchSkinData(gamertag) {
+    if (!gamertag) {
+        resultEl.innerHTML = '<strong>Please enter a gamertag.</strong>';
+        return;
+    }
+    
+    submitBtn.disabled = true;
+    const originalBtnText = submitBtn.innerText;
+    submitBtn.innerText = 'Loading...';
+    resultEl.innerHTML = `<em>Looking up XUID for <strong>${escapeHtml(gamertag)}</strong>…</em>`;
+    
+    try {
+        // 1) Get XUID
+        const xuidResp = await fetch(`https://api.geysermc.org/v2/xbox/xuid/${encodeURIComponent(gamertag)}`);
+        if (!xuidResp.ok) throw new Error(`XUID lookup failed: ${xuidResp.status} ${xuidResp.statusText}`);
+        const xuidText = await xuidResp.text();
+        let xuid = null;
+        try {
+            const xuidJson = JSON.parse(xuidText);
+            xuid = xuidJson?.xuid || xuidJson?.id || null;
+        } catch {
+            xuid = xuidText.trim();
+        }
+        if (!xuid) throw new Error('No XUID found for that gamertag.');
+        
+        resultEl.innerHTML = `<strong>XUID:</strong> ${escapeHtml(xuid)}<br/>Fetching skin data…`;
+        
+        // 2) Get skin data
+        const skinResp = await fetch(`https://api.geysermc.org/v2/skin/${encodeURIComponent(xuid)}`);
+        if (!skinResp.ok) throw new Error(`Skin lookup failed: ${skinResp.status} ${skinResp.statusText}`);
+        const skinText = await skinResp.text();
+        
+        // Extract texture ID (try multiple patterns)
+        const texturePatterns = [
+            /"texture_id"\s*:\s*"([a-f0-9]+)"/i,
+            /"textureId"\s*:\s*"([a-f0-9]+)"/i,
+            /https?:\/\/textures\.minecraft\.net\/texture\/([a-f0-9]+)/i,
+            /"url"\s*:\s*"https?:\/\/textures\.minecraft\.net\/texture\/([a-f0-9]+)"/i
+        ];
+        let textureId = null;
+        for (const p of texturePatterns) {
+            const m = skinText.match(p);
+            if (m && m[1]) {
+                textureId = m[1];
+                break;
             }
-            return response.json();
-        })
-        .then(data => {
-            console.log('XUID API Response:', data);  // Debugging log
-            if (data && data.xuid) {
-                const xuid = data.xuid;
-                document.getElementById('result').innerHTML = `XUID: ${xuid}`;
-
-                const apiUrlSkin = `https://api.geysermc.org/v2/skin/${xuid}`;
-
-                return fetch(apiUrlSkin)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.text();
-                    })
-                    .then(text => {
-                        console.log('Skin API Response:', text);  // Debugging log
-                        const textureIdMatch = text.match(/"texture_id":"([a-zA-Z0-9]+)"/);
-                        const isSteveMatch = text.match(/"is_steve":(true|false)/);
-                        const hashMatch = text.match(/"hash":"([a-zA-Z0-9]+)"/);
-
-                        if (textureIdMatch && textureIdMatch[1]) {
-                            const textureId = textureIdMatch[1];
-                            document.getElementById('result').innerHTML += `<br>Texture ID: ${textureId}`;
-
-                            const textureUrl = `https://textures.minecraft.net/texture/${textureId}`;
-                            const imgElement = document.createElement('img');
-                            imgElement.src = textureUrl;
-                            imgElement.alt = 'Minecraft Texture';
-                            imgElement.style.width = '128px';
-                            imgElement.style.height = '128px';
-                            document.getElementById('result').appendChild(imgElement);
-
-                            const downloadButton = document.createElement('a');
-                            downloadButton.href = textureUrl;
-                            downloadButton.download = `${gamertag}_texture.png`;
-                            const downloadBtnElement = document.createElement('button');
-                            downloadBtnElement.innerText = 'Download Texture';
-                            downloadButton.appendChild(downloadBtnElement);
-                            document.getElementById('result').appendChild(downloadButton);
-                        } else {
-                            document.getElementById('result').innerHTML += '<br>No Texture ID found.';
-                        }
-
-                        if (hashMatch && hashMatch[1]) {
-                            const hash = hashMatch[1];
-                            document.getElementById('result').innerHTML += `<br>Hash: ${hash}`;
-                        }
-
-                        if (isSteveMatch && isSteveMatch[1]) {
-                            const isSteve = isSteveMatch[1];
-                            document.getElementById('result').innerHTML += `<br>Is Steve: ${isSteve}`;
-                        }
-                    });
-            } else {
-                document.getElementById('result').innerText = 'No XUID found.';
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            document.getElementById('result').innerText = 'An error occurred.';
-        });
+        }
+        
+        const hashMatch = skinText.match(/"hash"\s*:\s*"([a-zA-Z0-9]+)"/i);
+        const isSteveMatch = skinText.match(/"is_steve"\s*:\s*(true|false)/i);
+        
+        // Build UI output
+        let html = `<strong>XUID:</strong> ${escapeHtml(xuid)}`;
+        if (textureId) {
+            const textureUrl = `https://textures.minecraft.net/texture/${textureId}`;
+            html += `<br/><strong>Texture ID:</strong> ${escapeHtml(textureId)}`;
+            html += `<div id="skinImageContainer"><img src="${textureUrl}" alt="Minecraft texture for ${escapeHtml(gamertag)}"></div>`;
+            html += `<div><a id="openTexture" class="download-link" href="${textureUrl}" target="_blank" rel="noopener">Open texture</a> · <a id="downloadTexture" class="download-link" href="#" role="button">Download texture</a></div>`;
+        } else {
+            html += `<br/><em>No texture ID found in API response.</em>`;
+        }
+        
+        if (hashMatch) html += `<br/><strong>Hash:</strong> ${escapeHtml(hashMatch[1])}`;
+        if (isSteveMatch) html += `<br/><strong>Is Steve:</strong> ${escapeHtml(isSteveMatch[1])}`;
+        
+        resultEl.innerHTML = html;
+        
+        // Add download handler
+        if (textureId) {
+            document.getElementById('downloadTexture').addEventListener('click', async (e) => {
+                e.preventDefault();
+                const url = `https://textures.minecraft.net/texture/${textureId}`;
+                const filename = `${gamertag}_texture.png`;
+                const btn = e.currentTarget;
+                try {
+                    btn.textContent = 'Downloading…';
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error(`Failed to fetch texture: ${resp.status}`);
+                    const blob = await resp.blob();
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(a.href);
+                    btn.textContent = 'Downloaded';
+                } catch (err) {
+                    console.warn('Download failed (possibly CORS). Opening in new tab.', err);
+                    window.open(url, '_blank', 'noopener');
+                    btn.textContent = 'Open texture';
+                }
+            }, { once: true });
+        }
+        
+    } catch (err) {
+        console.error(err);
+        resultEl.innerHTML = `<span style="color:crimson;">Error: ${escapeHtml(err.message)}</span>`;
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = originalBtnText;
+    }
 }
 
-document.getElementById('submitBtn').addEventListener('click', function() {
-    const gamertag = document.getElementById('gamertag').value.trim();
-    fetchSkinData(gamertag);
+// Prevent HTML injection in output
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (s) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    } [s]));
+}
+
+// Event listeners
+submitBtn.addEventListener('click', () => {
+    fetchSkinData(gamertagInput.value.trim());
 });
 
-document.getElementById('gamertag').addEventListener('keypress', function(event) {
-    if (event.key === 'Enter') {
-        const gamertag = document.getElementById('gamertag').value.trim();
-        fetchSkinData(gamertag);
+gamertagInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        fetchSkinData(gamertagInput.value.trim());
     }
 });

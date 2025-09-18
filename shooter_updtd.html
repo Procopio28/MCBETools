@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-<!-- Added Three.js library -->
+<!-- Three.js Core and GLTF Loader -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <title>Cosmic Courier 3D</title>
 <style>
 body { margin: 0; padding: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Courier New', Courier, monospace; }
@@ -30,7 +31,8 @@ p { font-size: 1.2em; margin: 5px 0; }
 .shop-section { margin-bottom: 20px; }
 .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 5px; background-color: rgba(0, 255, 255, 0.05); border-radius: 5px; text-align: left;}
 .shop-details { display: flex; align-items: center; flex-grow: 1; }
-.shop-preview { width: 30px; height: 30px; border: 2px solid #fff; margin-right: 15px; border-radius: 5px; flex-shrink: 0; }
+.shop-preview { width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.2); margin-right: 15px; border-radius: 5px; flex-shrink: 0; background-color: rgba(0,0,0,0.2); }
+.shop-preview canvas { border-radius: 5px; }
 .shop-info { display: flex; flex-direction: column; flex-grow: 1; }
 .shop-name { font-weight: bold; }
 .shop-desc, .shop-price { font-size: 0.9em; opacity: 0.8; }
@@ -183,27 +185,54 @@ const mpStatus = document.getElementById('mp-status');
 let player, stars, asteroids, particles, coins, powerUps, bullets, keys = {}, score = 0, coinsCollected = 0;
 let gameOver = true, gameSpeed, gameAreaWidth = 50;
 let asteroidSpawnTimer, coinSpawnTimer, shieldSpawnTimer, magnetSpawnTimer, weaponSpawnTimer;
+let shopPreviews = []; // For managing shop preview canvases
 
 // Multiplayer State
 let peer, conn, myPeerId, isHost = false, isMultiplayer = false, players = {};
 
-// --- Static Game Data (Values converted to seconds) ---
+// --- Static Game Data ---
 const SKINS_DATA = [
     { id: 'default', name: 'Default', price: 0, desc: "The classic courier.", shipColor: '#0ff', shieldColor: 'rgba(0, 255, 255, 0.2)', shieldStroke: '#00ffff' },
     { id: 'ember', name: 'Ember', price: 50, desc: "A fiery variant.", shipColor: '#ff4500', shieldColor: 'rgba(255, 69, 0, 0.3)', shieldStroke: '#ff4500' },
     { id: 'rogue', name: 'Rogue', price: 75, desc: "Sleek and dangerous.", shipColor: '#f44336', shieldColor: 'rgba(244, 67, 54, 0.3)', shieldStroke: '#f44336' },
     { id: 'venom', name: 'Venom', price: 100, desc: "A toxic choice.", shipColor: '#7cfc00', shieldColor: 'rgba(124, 252, 0, 0.3)', shieldStroke: '#7cfc00' },
     { id: 'nebula', name: 'Nebula', price: 150, desc: "Forged in the cosmos.", shipColor: '#9400d3', shieldColor: 'rgba(148, 0, 211, 0.3)', shieldStroke: '#9400d3' },
-    { id: 'custom', name: 'Custom Color', price: 250, desc: "Your own style. Top is shield color, bottom is ship color.", isCustom: true }
+    { id: 'custom', name: 'Custom Color', price: 250, desc: "Your own style.", isCustom: true },
+    { id: 'goliath', name: 'Goliath', price: 500, desc: "A custom imported model.", isGltf: true, modelPath: 'ship.glb' }
 ];
 const UPGRADES_DATA = {
-    // Fire rate in seconds (lower is faster)
     fireRate: { name: 'Fire Rate', desc: 'Increases bullet frequency.', prices: [50, 100, 200, 400], effects: [0.5, 0.4, 0.3, 0.2, 0.15] },
     damage: { name: 'Bullet Damage', desc: 'Destroy asteroids faster.', prices: [100, 250, 500], effects: [1, 2, 3, 4] },
     magnetRadius: { name: 'Magnet Radius', desc: 'Increases coin collection range.', prices: [75, 150, 300], effects: [15, 20, 25, 30] },
-    // Durations in seconds
     magnetDuration: { name: 'Magnet Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [5, 7, 9, 11] },
     weaponDuration: { name: 'Weapon Duration', desc: 'Increases power-up time.', prices: [50, 100, 200], effects: [5, 7, 9, 11] }
+};
+
+// --- Model Manager for GLB file ---
+const ModelManager = {
+    models: {},
+    isLoading: {},
+    load: function(path, callback) {
+        if (this.models[path]) {
+            if (callback) callback(this.models[path]);
+            return;
+        }
+        if (this.isLoading[path]) return;
+        this.isLoading[path] = true;
+        
+        const loader = new THREE.GLTFLoader();
+        loader.load(path, (gltf) => {
+            this.models[path] = gltf.scene;
+            this.isLoading[path] = false;
+            console.log(`Model ${path} loaded successfully.`);
+            if (callback) callback(this.models[path]);
+        }, undefined, (error) => {
+            console.error(`An error happened while loading ${path}:`, error);
+            this.isLoading[path] = false;
+            alert(`Could not load '${path}'. Make sure the file exists. The default ship will be used instead.`);
+            if (callback) callback(null);
+        });
+    }
 };
 
 // --- Saved Data & State (unchanged) ---
@@ -228,26 +257,42 @@ function setCanvasDimensions() {
     }
 }
 
-// --- 3D Object Classes (Updated for Delta Time) ---
+// --- 3D Object Classes (Updated with AABB Hitboxes) ---
 class Player {
     constructor() {
-        this.width = 4; this.height = 5;
-        this.speed = 40; // units per second
+        this.speed = 40;
         this.shieldActive = false; this.magnetActive = false; this.magnetTimer = 0;
         this.weaponActive = false; this.weaponTimer = 0; this.lastShotTime = 0;
         
         this.initUpgrades();
         this.setSkin();
 
-        const geometry = new THREE.ConeGeometry(this.width / 2, this.height, 8);
-        const material = new THREE.MeshStandardMaterial({ color: this.color, emissive: this.color, emissiveIntensity: 0.5 });
-        this.mesh = new THREE.Mesh(geometry, material);
+        const skinData = SKINS_DATA.find(s => s.id === equippedSkinId);
+        this.isGltf = skinData && skinData.isGltf && ModelManager.models[skinData.modelPath];
+
+        if (this.isGltf) {
+            this.mesh = ModelManager.models[skinData.modelPath].clone();
+            // --- IMPORTANT: Adjust these values to fit your model ---
+            this.mesh.scale.set(3, 3, 3); 
+            this.mesh.rotation.y = Math.PI;
+        } else {
+            this.mesh = new THREE.Mesh(
+                new THREE.ConeGeometry(2, 4, 8),
+                new THREE.MeshStandardMaterial({ color: this.color, emissive: this.color, emissiveIntensity: 0.5 })
+            );
+        }
         
-        const yPos = camera.bottom + this.height + (isMobileDevice() ? 15 : 3);
+        // Universal hitbox and radius calculation
+        this.hitbox = new THREE.Box3().setFromObject(this.mesh);
+        const size = this.hitbox.getSize(new THREE.Vector3());
+        this.radius = Math.max(size.x, size.y, size.z) / 2; // For collectible collision
+        
+        const yPos = camera.bottom + size.y / 2 + (isMobileDevice() ? 15 : 3);
         this.mesh.position.set(0, yPos, 0);
+        this.hitbox.setFromObject(this.mesh); // Recalculate after positioning
         scene.add(this.mesh);
 
-        const shieldGeometry = new THREE.SphereGeometry(this.width * 1.2, 32, 32);
+        const shieldGeometry = new THREE.SphereGeometry(this.radius * 1.5, 32, 32);
         const shieldMaterial = new THREE.MeshBasicMaterial({ color: this.shieldStrokeColor, transparent: true, opacity: 0.3 });
         this.shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
         this.shieldMesh.visible = false;
@@ -257,28 +302,31 @@ class Player {
     setSkin() { if (equippedSkinId === 'custom' && ownedSkins.includes('custom')) { this.color = customColors.shipColor; this.shieldStrokeColor = customColors.shipColor; } else { const skin = SKINS_DATA.find(s => s.id === equippedSkinId) || SKINS_DATA[0]; this.color = skin.shipColor; this.shieldStrokeColor = skin.shieldStroke; } }
     shoot() { if (this.weaponActive && clock.getElapsedTime() - this.lastShotTime >= this.fireRate) { bullets.push(new Bullet(this.mesh.position.x, this.mesh.position.y, this.damage, this.color)); this.lastShotTime = clock.getElapsedTime(); } }
     update(deltaTime) {
-        const moveBoundary = gameAreaWidth / 2 - this.width / 2;
-        if (keys['ArrowLeft'] && this.mesh.position.x > -moveBoundary) this.mesh.position.x -= this.speed * deltaTime;
-        if (keys['ArrowRight'] && this.mesh.position.x < moveBoundary) this.mesh.position.x += this.speed * deltaTime;
+        const moveBoundary = gameAreaWidth / 2 - this.hitbox.getSize(new THREE.Vector3()).x / 2;
+        const moveAmount = this.speed * deltaTime;
+        if (keys['ArrowLeft'] && this.mesh.position.x > -moveBoundary) {
+            this.mesh.position.x -= moveAmount;
+            this.hitbox.translate(new THREE.Vector3(-moveAmount, 0, 0));
+        }
+        if (keys['ArrowRight'] && this.mesh.position.x < moveBoundary) {
+            this.mesh.position.x += moveAmount;
+            this.hitbox.translate(new THREE.Vector3(moveAmount, 0, 0));
+        }
         
         this.shieldMesh.visible = this.shieldActive;
         if(this.shieldActive) this.shieldMesh.rotation.y += 2 * deltaTime;
-
         this.shoot();
     }
-    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); this.shieldMesh.geometry.dispose(); this.shieldMesh.material.dispose(); }
+    destroy() { scene.remove(this.mesh); if (!this.isGltf) { this.mesh.geometry.dispose(); this.mesh.material.dispose(); } this.shieldMesh.geometry.dispose(); this.shieldMesh.material.dispose(); }
 }
 
 class Bullet {
     constructor(x, y, damage, color) {
-        this.width = 0.3; this.height = 1.5;
-        this.speed = 80; // units per second
-        this.damage = damage;
-        
-        const geometry = new THREE.CylinderGeometry(this.width / 2, this.width / 2, this.height, 8);
+        this.radius = 0.2; this.speed = 80; this.damage = damage;
+        const geometry = new THREE.CylinderGeometry(this.radius, this.radius, 1.5, 8);
         const material = new THREE.MeshBasicMaterial({ color: color });
         this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.set(x, y + this.height, 0);
+        this.mesh.position.set(x, y + 3, 0);
         scene.add(this.mesh);
     }
     update(deltaTime) { this.mesh.position.y += this.speed * deltaTime; }
@@ -288,22 +336,23 @@ class Bullet {
 class Asteroid {
     constructor(x, y) {
         this.radius = Math.random() * 2.0 + 1.5;
-        const xPos = x !== undefined ? x : (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2);
-        const yPos = y !== undefined ? y : camera.top + this.radius;
-        
-        this.speed = (Math.random() * 8 + 10) * gameSpeed; // units per second
+        this.speed = (Math.random() * 8 + 10) * gameSpeed;
         this.rotationSpeed = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2);
         this.health = Math.max(1, Math.floor(this.radius));
-
         const geometry = new THREE.IcosahedronGeometry(this.radius, 0);
         const material = new THREE.MeshStandardMaterial({ color: 0xc5c5c5, flatShading: true });
         this.mesh = new THREE.Mesh(geometry, material);
+        const xPos = x !== undefined ? x : (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2);
+        const yPos = y !== undefined ? y : camera.top + this.radius;
         this.mesh.position.set(xPos, yPos, 0);
+        this.hitbox = new THREE.Box3().setFromObject(this.mesh);
         scene.add(this.mesh);
     }
     takeDamage(amount) { this.health -= amount; }
     update(deltaTime) { 
-        this.mesh.position.y -= this.speed * deltaTime; 
+        const moveAmount = this.speed * deltaTime;
+        this.mesh.position.y -= moveAmount; 
+        this.hitbox.translate(new THREE.Vector3(0, -moveAmount, 0));
         this.mesh.rotation.x += this.rotationSpeed.x * deltaTime; 
         this.mesh.rotation.y += this.rotationSpeed.y * deltaTime; 
         this.mesh.rotation.z += this.rotationSpeed.z * deltaTime; 
@@ -311,151 +360,59 @@ class Asteroid {
     destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
 }
 
-class Star {
-    constructor() {
-        const geometry = new THREE.SphereGeometry(0.1, 8, 8);
-        const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.set((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200);
-        this.speed = Math.random() * 5 + 2; // units per second
-        scene.add(this.mesh);
-    }
-    update(deltaTime) {
-        this.mesh.position.y -= this.speed * gameSpeed * deltaTime;
-        if (this.mesh.position.y < camera.bottom - 50) {
-            this.mesh.position.y = camera.top + 50;
-            this.mesh.position.x = (Math.random() - 0.5) * 200;
-        }
-    }
-}
-
-class Particle {
-    constructor(x, y, color) {
-        this.radius = Math.random() * 0.2 + 0.1;
-        const geometry = new THREE.SphereGeometry(this.radius, 4, 4);
-        const material = new THREE.MeshBasicMaterial({ color: color, transparent: true });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.position.set(x, y, 0);
-
-        this.velocity = new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)).normalize().multiplyScalar(Math.random() * 20);
-        this.life = 1; // 1 second
-        scene.add(this.mesh);
-    }
-    update(deltaTime) {
-        this.life -= deltaTime;
-        this.mesh.position.addScaledVector(this.velocity, deltaTime);
-        this.mesh.material.opacity = Math.max(0, this.life);
-    }
-    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
-}
-
-class Collectible {
-    constructor(color) {
-        this.radius = 1.2;
-        this.speed = 10 * gameSpeed; // units per second
-        this.color = color;
-    }
-    update(deltaTime) { 
-        this.mesh.position.y -= this.speed * deltaTime; 
-        this.mesh.rotation.y += 3 * deltaTime; 
-        this.mesh.rotation.z += 0.5 * deltaTime;
-    }
-    destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
-}
-
-class Coin extends Collectible {
-    constructor(x, y) {
-        super(0xFFD700);
-        const geometry = new THREE.CylinderGeometry(this.radius, this.radius, 0.4, 16);
-        const material = new THREE.MeshStandardMaterial({ color: this.color, emissive: this.color, emissiveIntensity: 0.4, metalness: 0.5, roughness: 0.3 });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.rotation.x = Math.PI / 2;
-        const xPos = x !== undefined ? x : (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2);
-        const yPos = y !== undefined ? y : camera.top + this.radius;
-        this.mesh.position.set(xPos, yPos, 0);
-        scene.add(this.mesh);
-    }
-}
-
-class PowerUp extends Collectible {
-    constructor(color) {
-        super(color);
-        const geometry = new THREE.SphereGeometry(this.radius, 16, 16);
-        const material = new THREE.MeshBasicMaterial({ color: this.color, transparent: true, opacity: 0.8 });
-        this.mesh = new THREE.Mesh(geometry, material);
-        const xPos = (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2);
-        const yPos = camera.top + this.radius;
-        this.mesh.position.set(xPos, yPos, 0);
-        scene.add(this.mesh);
-    }
-    update(deltaTime) {
-        super.update(deltaTime);
-        const pulse = Math.sin(clock.getElapsedTime() * 5) * 0.1 + 1;
-        this.mesh.scale.set(pulse, pulse, pulse);
-    }
-}
+// Other classes (Star, Particle, Collectible, Coin, PowerUp) are unchanged from the previous version...
+class Star { constructor() { const geometry = new THREE.SphereGeometry(0.1, 8, 8); const material = new THREE.MeshBasicMaterial({ color: 0xffffff }); this.mesh = new THREE.Mesh(geometry, material); this.mesh.position.set((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200); this.speed = Math.random() * 5 + 2; scene.add(this.mesh); } update(deltaTime) { this.mesh.position.y -= this.speed * gameSpeed * deltaTime; if (this.mesh.position.y < camera.bottom - 50) { this.mesh.position.y = camera.top + 50; this.mesh.position.x = (Math.random() - 0.5) * 200; } } }
+class Particle { constructor(x, y, color) { this.radius = Math.random() * 0.2 + 0.1; const geometry = new THREE.SphereGeometry(this.radius, 4, 4); const material = new THREE.MeshBasicMaterial({ color: color, transparent: true }); this.mesh = new THREE.Mesh(geometry, material); this.mesh.position.set(x, y, 0); this.velocity = new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)).normalize().multiplyScalar(Math.random() * 20); this.life = 1; scene.add(this.mesh); } update(deltaTime) { this.life -= deltaTime; this.mesh.position.addScaledVector(this.velocity, deltaTime); this.mesh.material.opacity = Math.max(0, this.life); } destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); } }
+class Collectible { constructor(color) { this.radius = 1.2; this.speed = 10 * gameSpeed; this.color = color; } update(deltaTime) { this.mesh.position.y -= this.speed * deltaTime; this.mesh.rotation.y += 3 * deltaTime; this.mesh.rotation.z += 0.5 * deltaTime; } destroy() { scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); } }
+class Coin extends Collectible { constructor(x, y) { super(0xFFD700); const geometry = new THREE.CylinderGeometry(this.radius, this.radius, 0.4, 16); const material = new THREE.MeshStandardMaterial({ color: this.color, emissive: this.color, emissiveIntensity: 0.4, metalness: 0.5, roughness: 0.3 }); this.mesh = new THREE.Mesh(geometry, material); this.mesh.rotation.x = Math.PI / 2; const xPos = x !== undefined ? x : (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2); const yPos = y !== undefined ? y : camera.top + this.radius; this.mesh.position.set(xPos, yPos, 0); scene.add(this.mesh); } }
+class PowerUp extends Collectible { constructor(color) { super(color); const geometry = new THREE.SphereGeometry(this.radius, 16, 16); const material = new THREE.MeshBasicMaterial({ color: this.color, transparent: true, opacity: 0.8 }); this.mesh = new THREE.Mesh(geometry, material); const xPos = (Math.random() - 0.5) * (gameAreaWidth - this.radius * 2); const yPos = camera.top + this.radius; this.mesh.position.set(xPos, yPos, 0); scene.add(this.mesh); } update(deltaTime) { super.update(deltaTime); const pulse = Math.sin(clock.getElapsedTime() * 5) * 0.1 + 1; this.mesh.scale.set(pulse, pulse, pulse); } }
 class ShieldPowerUp extends PowerUp { constructor() { super(0x39FF14); } }
 class MagnetPowerUp extends PowerUp { constructor() { super(0xFF00FF); } }
 class WeaponPowerUp extends PowerUp { constructor() { super(0xFF6347); } }
 
 function init() {
-    isMultiplayer = false;
-    
-    if (scene) {
-        while(scene.children.length > 0){ 
-            const obj = scene.children[0];
-            scene.remove(obj);
-            if(obj.geometry) obj.geometry.dispose();
-            if(obj.material) obj.material.dispose();
+    const startGame = () => {
+        isMultiplayer = false;
+        if (scene) { while(scene.children.length > 0){ const obj = scene.children[0]; scene.remove(obj); if(obj.geometry) obj.geometry.dispose(); if(obj.material) obj.material.dispose(); } } 
+        else {
+            scene = new THREE.Scene(); clock = new THREE.Clock();
+            camera = new THREE.OrthographicCamera( -gameAreaWidth/2, gameAreaWidth/2, 1, -1, 1, 1000 );
+            camera.position.z = 100;
+            renderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio); renderer.setClearColor(0x000000, 0);
         }
-    } else {
-        scene = new THREE.Scene();
-        clock = new THREE.Clock();
-        camera = new THREE.OrthographicCamera( -gameAreaWidth/2, gameAreaWidth/2, 1, -1, 1, 1000 );
-        camera.position.z = 100;
-        renderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true, alpha: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setClearColor(0x000000, 0);
-    }
-    
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 10, 7);
-    scene.add(directionalLight);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); directionalLight.position.set(5, 10, 7); scene.add(directionalLight);
+        setCanvasDimensions();
+        player = new Player();
+        stars = []; for (let i = 0; i < 200; i++) stars.push(new Star());
+        asteroids = []; coins = []; powerUps = []; particles = []; bullets = [];
+        score = 0; coinsCollected = 0; gameOver = false; gameSpeed = 1.0; 
+        asteroidSpawnTimer = 1.5; coinSpawnTimer = 4.0; shieldSpawnTimer = 15.0; magnetSpawnTimer = 22.0; weaponSpawnTimer = 18.0;
+        startScreen.style.display = 'none'; gameOverScreen.style.display = 'none'; shopScreen.style.display = 'none'; settingsScreen.style.display = 'none'; howToPlayScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameStatsContainer.style.display = 'flex';
+        updateStatsDisplay();
+        if (isMobileDevice()) mobileControls.style.display = 'flex';
+        restartButton.textContent = "Try Again (Single Player)";
+        clock.start();
+        gameLoop();
+    };
 
-    setCanvasDimensions();
-    
-    player = new Player();
-    stars = []; for (let i = 0; i < 200; i++) stars.push(new Star());
-    asteroids = []; coins = []; powerUps = []; particles = []; bullets = [];
-    
-    score = 0; coinsCollected = 0; gameOver = false; 
-    gameSpeed = 1.0; 
-    
-    // Initialize spawn timers (in seconds)
-    asteroidSpawnTimer = 1.5;
-    coinSpawnTimer = 4.0;
-    shieldSpawnTimer = 15.0;
-    magnetSpawnTimer = 22.0;
-    weaponSpawnTimer = 18.0;
-    
-    startScreen.style.display = 'none'; gameOverScreen.style.display = 'none'; shopScreen.style.display = 'none'; settingsScreen.style.display = 'none'; howToPlayScreen.style.display = 'none'; multiplayerScreen.style.display = 'none'; gameStatsContainer.style.display = 'flex';
-    updateStatsDisplay();
-    if (isMobileDevice()) mobileControls.style.display = 'flex';
-    restartButton.textContent = "Try Again (Single Player)";
-    
-    clock.start();
-    gameLoop();
+    const skinData = SKINS_DATA.find(s => s.id === equippedSkinId);
+    if (skinData && skinData.isGltf && !ModelManager.models[skinData.modelPath]) {
+        startButton.disabled = true; startButton.textContent = 'LOADING MODEL...';
+        ModelManager.load(skinData.modelPath, (model) => {
+            startButton.disabled = false; startButton.textContent = 'Start Game';
+            if (model) startGame();
+        });
+    } else {
+        startGame();
+    }
 }
 
 function gameLoop() {
     if (gameOver) { clock.stop(); return; }
     requestAnimationFrame(gameLoop);
-    
     const deltaTime = clock.getDelta();
-    
-    // Update game objects
     player.update(deltaTime);
     stars.forEach(star => star.update(deltaTime));
     asteroids.forEach(a => a.update(deltaTime));
@@ -464,13 +421,8 @@ function gameLoop() {
     bullets.forEach(b => b.update(deltaTime));
     particles.forEach(p => p.update(deltaTime));
 
-    // Spawning logic based on timers
     asteroidSpawnTimer -= deltaTime;
-    if (asteroidSpawnTimer <= 0) {
-        spawnAsteroid();
-        const baseInterval = 1.5;
-        asteroidSpawnTimer = Math.max(0.4, baseInterval / gameSpeed);
-    }
+    if (asteroidSpawnTimer <= 0) { spawnAsteroid(); const baseInterval = 1.5; asteroidSpawnTimer = Math.max(0.4, baseInterval / gameSpeed); }
     coinSpawnTimer -= deltaTime;
     if (coinSpawnTimer <= 0) { coins.push(new Coin()); coinSpawnTimer = 4.0 / gameSpeed; }
     shieldSpawnTimer -= deltaTime;
@@ -480,98 +432,62 @@ function gameLoop() {
     weaponSpawnTimer -= deltaTime;
     if (weaponSpawnTimer <= 0) { powerUps.push(new WeaponPowerUp()); weaponSpawnTimer = 18.0; }
 
-
-    // Power-up timer countdowns
     if (player.magnetActive) { player.magnetTimer -= deltaTime; if (player.magnetTimer <= 0) player.magnetActive = false; }
     if (player.weaponActive) { player.weaponTimer -= deltaTime; if (player.weaponTimer <= 0) player.weaponActive = false; }
 
-    // Collision detection and cleanup
     handleCollisions();
     cleanupObjects();
-
     score++; 
-    gameSpeed += 0.002 * deltaTime; // Slower, time-based increase
+    gameSpeed += 0.002 * deltaTime;
     updateStatsDisplay();
-    
     renderer.render(scene, camera);
 }
 
 function spawnAsteroid() {
-    let newAsteroid;
-    let overlap;
-    let attempts = 0;
+    let newAsteroid; let overlap; let attempts = 0;
     do {
         overlap = false;
         const x = (Math.random() - 0.5) * (gameAreaWidth - 4);
         const y = camera.top + 4;
         newAsteroid = new Asteroid(x, y);
-        for (const existing of asteroids) {
-            if (newAsteroid.mesh.position.distanceTo(existing.mesh.position) < newAsteroid.radius + existing.radius) {
-                overlap = true;
-                newAsteroid.destroy();
-                break;
-            }
-        }
+        for (const existing of asteroids) { if (newAsteroid.hitbox.intersectsBox(existing.hitbox)) { overlap = true; newAsteroid.destroy(); break; } }
         attempts++;
     } while (overlap && attempts < 10);
     asteroids.push(newAsteroid);
 }
 
 function handleCollisions() {
-    // Bullets vs Asteroids
     bullets.forEach((bullet, bIndex) => {
         let hit = false;
         asteroids.forEach((asteroid, aIndex) => {
             if (hit) return;
-            if (bullet.mesh.position.distanceTo(asteroid.mesh.position) < asteroid.radius + bullet.width) {
-                hit = true;
-                asteroid.takeDamage(bullet.damage);
+            if (bullet.mesh.position.distanceTo(asteroid.mesh.position) < asteroid.radius + bullet.radius) {
+                hit = true; asteroid.takeDamage(bullet.damage);
                 createExplosion(bullet.mesh.position.x, bullet.mesh.position.y, 0xffff64, 3);
-                bullet.destroy();
-                bullets.splice(bIndex, 1);
+                bullet.destroy(); bullets.splice(bIndex, 1);
                 if (asteroid.health <= 0) {
                     createExplosion(asteroid.mesh.position.x, asteroid.mesh.position.y, 0xc5c5c5, 15);
                     score += 50;
                     const numCoins = Math.floor(Math.random() * 3) + 1;
-                    for(let i = 0; i < numCoins; i++) {
-                        coins.push(new Coin(asteroid.mesh.position.x + (Math.random() - 0.5) * 2, asteroid.mesh.position.y + (Math.random() - 0.5) * 2));
-                    }
-                    asteroid.destroy();
-                    asteroids.splice(aIndex, 1);
+                    for(let i = 0; i < numCoins; i++) { coins.push(new Coin(asteroid.mesh.position.x + (Math.random() - 0.5) * 2, asteroid.mesh.position.y + (Math.random() - 0.5) * 2)); }
+                    asteroid.destroy(); asteroids.splice(aIndex, 1);
                 }
             }
         });
     });
-
-    // Player vs Asteroids
+    // Player vs Asteroids using precise AABB collision
     asteroids.forEach((asteroid, index) => {
-        if (player.mesh.position.distanceTo(asteroid.mesh.position) < asteroid.radius + player.width / 2) {
-            if (player.shieldActive) {
-                player.shieldActive = false;
-                createExplosion(asteroid.mesh.position.x, asteroid.mesh.position.y, 0xc5c5c5, 15);
-                asteroid.destroy();
-                asteroids.splice(index, 1);
-            } else {
-                createExplosion(player.mesh.position.x, player.mesh.position.y, 0xf44336, 30);
-                endGame();
-            }
+        if (player.hitbox.intersectsBox(asteroid.hitbox)) {
+            if (player.shieldActive) { player.shieldActive = false; createExplosion(asteroid.mesh.position.x, asteroid.mesh.position.y, 0xc5c5c5, 15); asteroid.destroy(); asteroids.splice(index, 1); } 
+            else { createExplosion(player.mesh.position.x, player.mesh.position.y, 0xf44336, 30); endGame(); }
         }
     });
-    
-    // Player vs Collectibles
     coins.forEach((coin, index) => {
-        if (player.magnetActive && coin.mesh.position.distanceTo(player.mesh.position) < player.magnetRadius) {
-            coin.mesh.position.lerp(player.mesh.position, 0.1);
-        }
-        if (player.mesh.position.distanceTo(coin.mesh.position) < coin.radius + player.width / 2) {
-            coinsCollected++; totalCoins++;
-            createExplosion(coin.mesh.position.x, coin.mesh.position.y, 0xFFD700, 10);
-            coin.destroy();
-            coins.splice(index, 1);
-        }
+        if (player.magnetActive && coin.mesh.position.distanceTo(player.mesh.position) < player.magnetRadius) { coin.mesh.position.lerp(player.mesh.position, 0.1); }
+        if (player.mesh.position.distanceTo(coin.mesh.position) < coin.radius + player.radius) { coinsCollected++; totalCoins++; createExplosion(coin.mesh.position.x, coin.mesh.position.y, 0xFFD700, 10); coin.destroy(); coins.splice(index, 1); }
     });
     powerUps.forEach((powerUp, index) => {
-        if (player.mesh.position.distanceTo(powerUp.mesh.position) < powerUp.radius + player.width / 2) {
+        if (player.mesh.position.distanceTo(powerUp.mesh.position) < powerUp.radius + player.radius) {
             if (powerUp instanceof ShieldPowerUp) player.shieldActive = true;
             else if (powerUp instanceof MagnetPowerUp) { player.magnetActive = true; player.magnetTimer = player.magnetDuration; }
             else if (powerUp instanceof WeaponPowerUp) { player.weaponActive = true; player.weaponTimer = player.weaponDuration; }
@@ -582,35 +498,18 @@ function handleCollisions() {
 }
 
 function cleanupObjects() {
-    const bottomBoundary = camera.bottom - 5;
-    const topBoundary = camera.top + 5;
-    
-    const cleanup = (arr) => {
-        for (let i = arr.length - 1; i >= 0; i--) {
-            const obj = arr[i];
-            if (obj.mesh.position.y < bottomBoundary || obj.mesh.position.y > topBoundary || (obj.life !== undefined && obj.life <= 0)) {
-                obj.destroy();
-                arr.splice(i, 1);
-            }
-        }
-    };
-    cleanup(asteroids);
-    cleanup(coins);
-    cleanup(powerUps);
-    cleanup(bullets);
-    cleanup(particles);
+    const bottomBoundary = camera.bottom - 5; const topBoundary = camera.top + 5;
+    const cleanup = (arr) => { for (let i = arr.length - 1; i >= 0; i--) { const obj = arr[i]; if (obj.mesh.position.y < bottomBoundary || obj.mesh.position.y > topBoundary || (obj.life !== undefined && obj.life <= 0)) { obj.destroy(); arr.splice(i, 1); } } };
+    cleanup(asteroids); cleanup(coins); cleanup(powerUps); cleanup(bullets); cleanup(particles);
 }
 
-function createExplosion(x, y, color, n) {
-    for (let i = 0; i < n; i++) particles.push(new Particle(x, y, color));
-}
+function createExplosion(x, y, color, n) { for (let i = 0; i < n; i++) particles.push(new Particle(x, y, color)); }
 
 function endGame(loserId = null) {
     if (gameOver) return;
     gameOver = true; keys = {};
-    if (isMultiplayer) {
-      // Multiplayer end game logic (unchanged)
-    } else {
+    if (isMultiplayer) { /* Multiplayer logic */ } 
+    else {
         if (score > highScore) { highScore = score; }
         saveData();
         restartButton.textContent = "Try Again (Single Player)"; restartButton.onclick = init;
@@ -621,25 +520,140 @@ function endGame(loserId = null) {
     gameOverScreen.style.display = 'flex';
 }
 
-// --- UI, SHOP, and MULTIPLAYER LOGIC (unchanged) ---
+// --- UI, SHOP, and MULTIPLAYER LOGIC ---
 function updateStatsDisplay() { if (isMultiplayer) { if(players[myPeerId]) { const myStats = players[myPeerId]; scoreEl.textContent = 'Score: ' + myStats.score; coinScoreEl.innerHTML = `<span class="coin-icon"></span>${myStats.coins}`; } highScoreEl.style.display = 'none'; totalCoinsStatEl.style.display = 'none'; } else { scoreEl.textContent = 'Score: ' + Math.floor(score); highScoreEl.textContent = 'High Score: ' + Math.floor(highScore); coinScoreEl.innerHTML = `<span class="coin-icon"></span>${coinsCollected}`; totalCoinsStatEl.innerHTML = `Total Coins: ${totalCoins}<span class="coin-icon"></span>`; highScoreEl.style.display = 'inline'; totalCoinsStatEl.style.display = 'inline'; } }
 function buyUpgrade(type) { const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const price = data.prices[state.maxLevel]; if (totalCoins >= price) { totalCoins -= price; state.maxLevel++; state.equippedLevel = state.maxLevel; saveData(); populateShop(); } }
 function setEquippedLevel(type, newLevel) { const state = upgradesState[type]; if (newLevel >= 0 && newLevel <= state.maxLevel) { state.equippedLevel = newLevel; saveData(); populateShop(); } }
 function buySkin(skinId) { const skin = SKINS_DATA.find(s => s.id === skinId); if (!skin || skin.price > totalCoins) return; totalCoins -= skin.price; ownedSkins.push(skinId); equipSkin(skinId); }
-function equipSkin(skinId) { if (ownedSkins.includes(skinId)) { equippedSkinId = skinId; saveData(); populateShop(); } }
+function equipSkin(skinId) {
+    if (ownedSkins.includes(skinId)) {
+        equippedSkinId = skinId; saveData(); populateShop();
+        const skinData = SKINS_DATA.find(s => s.id === skinId);
+        if (skinData.isGltf && !ModelManager.models[skinData.modelPath]) {
+            alert("Equipping GLB skin. The model will now download. The game will be ready to start from the main menu once it's loaded.");
+            ModelManager.load(skinData.modelPath);
+        }
+    }
+}
 function handleCustomColorChange(type, color) { customColors[type] = color; if (equippedSkinId === 'custom') { equipSkin('custom'); } else { saveData(); populateShop(); } }
-function populateShop() { if (totalCoinsDisplayP) { totalCoinsDisplayP.innerHTML = `Total Coins: <span>${totalCoins}</span><span class="coin-icon"></span>`; } upgradesContainer.innerHTML = ''; skinsContainer.innerHTML = ''; Object.keys(UPGRADES_DATA).forEach(type => { const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const isMaxed = state.maxLevel >= data.prices.length; const price = isMaxed ? 'N/A' : data.prices[state.maxLevel]; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isMaxed) { actionsHTML = `<button class="button" disabled>Maxed Out</button>`; } else { actionsHTML = `<button class="button" onclick="buyUpgrade('${type}')" ${totalCoins < price ? 'disabled' : ''}>Upgrade</button>`; } item.innerHTML = `<div class="shop-details"><div class="shop-info"><div class="shop-name-wrapper"><span class="shop-name">${data.name}</span><div class="level-controls"><span class="level-arrow ${state.equippedLevel <= 0 ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel-1})"><</span><span class="level-text">Lvl ${state.equippedLevel+1} / ${state.maxLevel+1}</span><span class="level-arrow ${state.equippedLevel >= state.maxLevel ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel+1})">></span></div></div><div class="shop-desc">${data.desc}</div><div class="shop-price">Next Level: ${price} <span class="coin-icon"></span></div></div></div><div class="shop-actions">${actionsHTML}</div>`; upgradesContainer.appendChild(item); }); SKINS_DATA.forEach(skin => { const isOwned = ownedSkins.includes(skin.id); const isEquipped = equippedSkinId === skin.id; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isOwned) { actionsHTML = `<button class="button" ${isEquipped ? 'disabled' : ''} onclick="equipSkin('${skin.id}')">${isEquipped ? 'Equipped' : 'Equip'}</button>`; } else { actionsHTML = `<button class="button" onclick="buySkin('${skin.id}')" ${totalCoins < skin.price ? 'disabled' : ''}>Buy</button>`; } let customControls = ''; if (skin.isCustom && isOwned) { customControls = `<input type="color" class="custom-color-picker" value="${customColors.shipColor}" oninput="handleCustomColorChange('shipColor', this.value)"><input type="color" class="custom-color-picker" value="${customColors.shieldColor.startsWith('#') ? customColors.shieldColor.substring(0, 7) : '#ffffff'}" oninput="handleCustomColorChange('shieldColor', this.value + '4D')">`; } item.innerHTML = `<div class="shop-details"><div class="shop-preview" style="background-color: ${skin.isCustom ? customColors.shipColor : skin.shipColor};"></div><div class="shop-info"><div class="shop-name-wrapper"><span class="shop-name">${skin.name}</span><span>${customControls}</span></div><div class="shop-desc">${skin.desc}</div><div class="shop-price">${isOwned ? 'Owned' : `${skin.price} <span class="coin-icon"></span>`}</div></div></div><div class="shop-actions">${actionsHTML}</div>`; skinsContainer.appendChild(item); });}
-function initializePeer(id) { if (peer) peer.destroy(); peer = new Peer(id); peer.on('open', (id) => { myPeerId = id; console.log('My peer ID is: ' + id); if (isHost) { mpStatus.textContent = `Room Created! ID: ${id}`; roomIdInput.value = id; roomIdInput.disabled = true; createRoomButton.disabled = true; joinRoomButton.disabled = true; } }); peer.on('connection', (connection) => { console.log('A player has connected!'); conn = connection; setupConnectionEvents(); }); peer.on('error', (err) => { console.error(err); mpStatus.textContent = `Error: ${err.type}. Try another ID.`; resetMultiplayerUI(); }); }
-function setupConnectionEvents() { conn.on('open', () => { if (isHost) { mpStatus.textContent = 'Player 2 connected! Starting game...'; const pTemplate = new Player(); const yPos = pTemplate.mesh.position.y; players[myPeerId] = { x: -10, y: yPos, score: 0, coins: 0, color: '#0ff' }; players[conn.peer] = { x: 10, y: yPos, score: 0, coins: 0, color: '#ff4500' }; pTemplate.destroy(); setTimeout(startMultiplayerGame, 1500); } else { mpStatus.textContent = 'Connected! Waiting for host to start...'; } }); conn.on('data', (data) => { if (isHost) { if (data.type === 'input' && players[conn.peer]) { const clientPlayer = players[conn.peer]; if (data.key === 'ArrowLeft' && clientPlayer.x > -gameAreaWidth/2) clientPlayer.x -= 0.5; if (data.key === 'ArrowRight' && clientPlayer.x < gameAreaWidth/2) clientPlayer.x += 0.5; } } else { if (data.type === 'gameState' && gameOver) { startMultiplayerGame(); } if (data.type === 'gameState') { asteroids = data.asteroids; coins = data.coins; players = data.players; } else if (data.type === 'gameOver') { endGame(data.loser); } } }); conn.on('close', () => { if(!gameOver) { mpStatus.textContent = 'Player disconnected.'; endGame(); } }); }
-function startMultiplayerGame() { isMultiplayer = true; init(); /* Multiplayer init now uses the main init */ }
-function resetMultiplayerUI() { if(peer) peer.destroy(); peer = null; conn = null; isHost = false; roomIdInput.value = ''; roomIdInput.disabled = false; createRoomButton.disabled = false; joinRoomButton.disabled = false; mpStatus.textContent = "Create a room or join a friend's."; }
+
+// --- Shop Preview Logic ---
+function setupShopPreview(container, modelPath) {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambient);
+    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+    directional.position.set(1, 2, 3);
+    scene.add(directional);
+
+    let model, animationId;
+
+    ModelManager.load(modelPath, (loadedModel) => {
+        if (!loadedModel) return;
+        model = loadedModel.clone();
+        
+        // Auto-frame the model
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const maxSize = Math.max(size.x, size.y, size.z);
+        const fitHeightDistance = maxSize / (2 * Math.atan(Math.PI * camera.aspect / 360));
+        const fitWidthDistance = fitHeightDistance / camera.aspect;
+        const distance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance);
+
+        camera.position.copy(center);
+        camera.position.z += distance;
+        
+        scene.add(model);
+        animate();
+    });
+
+    function animate() {
+        animationId = requestAnimationFrame(animate);
+        if (model) model.rotation.y += 0.01;
+        renderer.render(scene, camera);
+    }
+
+    shopPreviews.push({ scene, renderer, animationId });
+}
+
+function cleanupShopPreviews() {
+    shopPreviews.forEach(({ scene, renderer, animationId }) => {
+        cancelAnimationFrame(animationId);
+        if (scene) {
+            scene.traverse(object => {
+                if (object.geometry) object.geometry.dispose();
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(material => material.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            });
+        }
+        if (renderer) {
+            renderer.dispose();
+            renderer.domElement.remove();
+        }
+    });
+    shopPreviews = [];
+}
+
+function populateShop() { 
+    cleanupShopPreviews();
+    if (totalCoinsDisplayP) { totalCoinsDisplayP.innerHTML = `Total Coins: <span>${totalCoins}</span><span class="coin-icon"></span>`; } 
+    upgradesContainer.innerHTML = ''; skinsContainer.innerHTML = ''; 
+    Object.keys(UPGRADES_DATA).forEach(type => { const data = UPGRADES_DATA[type]; const state = upgradesState[type]; const isMaxed = state.maxLevel >= data.prices.length; const price = isMaxed ? 'N/A' : data.prices[state.maxLevel]; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isMaxed) { actionsHTML = `<button class="button" disabled>Maxed Out</button>`; } else { actionsHTML = `<button class="button" onclick="buyUpgrade('${type}')" ${totalCoins < price ? 'disabled' : ''}>Upgrade</button>`; } item.innerHTML = `<div class="shop-details"><div class="shop-info"><div class="shop-name-wrapper"><span class="shop-name">${data.name}</span><div class="level-controls"><span class="level-arrow ${state.equippedLevel <= 0 ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel-1})"><</span><span class="level-text">Lvl ${state.equippedLevel+1} / ${state.maxLevel+1}</span><span class="level-arrow ${state.equippedLevel >= state.maxLevel ? 'disabled' : ''}" onclick="setEquippedLevel('${type}', ${state.equippedLevel+1})">></span></div></div><div class="shop-desc">${data.desc}</div><div class="shop-price">Next Level: ${price} <span class="coin-icon"></span></div></div></div><div class="shop-actions">${actionsHTML}</div>`; upgradesContainer.appendChild(item); }); 
+    SKINS_DATA.forEach(skin => { 
+        const isOwned = ownedSkins.includes(skin.id); const isEquipped = equippedSkinId === skin.id; const item = document.createElement('div'); item.className = 'shop-item'; let actionsHTML; if (isOwned) { actionsHTML = `<button class="button" ${isEquipped ? 'disabled' : ''} onclick="equipSkin('${skin.id}')">${isEquipped ? 'Equipped' : 'Equip'}</button>`; } else { actionsHTML = `<button class="button" onclick="buySkin('${skin.id}')" ${totalCoins < skin.price ? 'disabled' : ''}>Buy</button>`; } 
+        let customControls = ''; if (skin.isCustom && isOwned) { customControls = `<input type="color" class="custom-color-picker" value="${customColors.shipColor}" oninput="handleCustomColorChange('shipColor', this.value)"><input type="color" class="custom-color-picker" value="${customColors.shieldColor.startsWith('#') ? customColors.shieldColor.substring(0, 7) : '#ffffff'}" oninput="handleCustomColorChange('shieldColor', this.value + '4D')">`; } 
+        
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'shop-preview';
+        
+        if (skin.isGltf) {
+            setupShopPreview(previewContainer, skin.modelPath);
+        } else {
+            previewContainer.style.backgroundColor = skin.isCustom ? customColors.shipColor : skin.shipColor;
+        }
+
+        const detailsHTML = `<div class="shop-details"></div><div class="shop-info"><div class="shop-name-wrapper"><span class="shop-name">${skin.name}</span><span>${customControls}</span></div><div class="shop-desc">${skin.desc}</div><div class="shop-price">${isOwned ? 'Owned' : `${skin.price} <span class="coin-icon"></span>`}</div></div>`;
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'shop-actions';
+        actionsContainer.innerHTML = actionsHTML;
+        
+        item.appendChild(previewContainer);
+        const detailsContainer = document.createElement('div');
+        detailsContainer.className = 'shop-details'; // Re-using class for layout
+        detailsContainer.innerHTML = detailsHTML;
+        item.appendChild(detailsContainer);
+        item.appendChild(actionsContainer);
+
+        skinsContainer.appendChild(item); 
+    });
+}
 
 // --- EVENT LISTENERS ---
 window.addEventListener('keydown', e => keys[e.key] = true); window.addEventListener('keyup', e => keys[e.key] = false);
 startButton.addEventListener('click', init);
 restartButton.addEventListener('click', init);
 shopButton.addEventListener('click', () => { startScreen.style.display = 'none'; shopScreen.style.display = 'flex'; populateShop(); });
-closeShopButton.addEventListener('click', () => { shopScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
+closeShopButton.addEventListener('click', () => { 
+    cleanupShopPreviews();
+    shopScreen.style.display = 'none'; 
+    startScreen.style.display = 'flex'; 
+    const skinData = SKINS_DATA.find(s => s.id === equippedSkinId);
+    if (skinData && skinData.isGltf && !ModelManager.models[skinData.modelPath]) {
+        startButton.disabled = true; startButton.textContent = 'LOADING MODEL...';
+        ModelManager.load(skinData.modelPath, () => { startButton.disabled = false; startButton.textContent = 'Start Game'; });
+    }
+});
 settingsButton.addEventListener('click', () => { startScreen.style.display = 'none'; settingsScreen.style.display = 'flex'; });
 closeSettingsButton.addEventListener('click', () => { settingsScreen.style.display = 'none'; startScreen.style.display = 'flex'; });
 howToPlayButton.addEventListener('click', () => { startScreen.style.display = 'none'; howToPlayScreen.style.display = 'flex'; });
@@ -649,7 +663,10 @@ goToShopButton.addEventListener('click', () => { gameOverScreen.style.display = 
 resetHighScoreButton.addEventListener('click', () => { if (confirm('Are you sure you want to reset your High Score? This cannot be undone.')) { highScore = 0; saveData(); alert('High Score reset!'); } });
 resetProgressButton.addEventListener('click', resetProgress);
 if (isMobileDevice()) { leftBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowLeft'] = true; }, { passive: false }); leftBtn.addEventListener('touchend', () => keys['ArrowLeft'] = false); rightBtn.addEventListener('touchstart', e => { e.preventDefault(); keys['ArrowRight'] = true; }, { passive: false }); rightBtn.addEventListener('touchend', () => keys['ArrowRight'] = false); }
-window.addEventListener('resize', setCanvasDimensions);
+window.addEventListener('resize', () => {
+    setCanvasDimensions();
+    // Could add logic here to resize shop previews if needed, but for now it's simpler to just let them be fixed size.
+});
 multiplayerButton.addEventListener('click', () => { startScreen.style.display = 'none'; multiplayerScreen.style.display = 'flex'; });
 backToMenuButton.addEventListener('click', () => { multiplayerScreen.style.display = 'none'; startScreen.style.display = 'flex'; resetMultiplayerUI(); });
 createRoomButton.addEventListener('click', () => { isHost = true; let roomId = 'cosmic' + Math.floor(Math.random() * 9000 + 1000); initializePeer(roomId); });
@@ -657,6 +674,11 @@ joinRoomButton.addEventListener('click', () => { isHost = false; const roomId = 
 
 // Initial setup on page load
 loadData();
+const initialSkin = SKINS_DATA.find(s => s.id === equippedSkinId);
+if (initialSkin && initialSkin.isGltf) {
+    startButton.disabled = true; startButton.textContent = 'LOADING MODEL...';
+    ModelManager.load(initialSkin.modelPath, () => { startButton.disabled = false; startButton.textContent = 'Start Game'; });
+}
 gameStatsContainer.style.display = 'none';
 </script>
 </body>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mobile-Friendly Bedrock Map</title>
+    <style>
+        /* Prevents pull-to-refresh and other browser gestures over the map */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .header {
+            background-color: #252526;
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .controls-group {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .controls label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .controls input {
+            padding: 8px;
+            border: 1px solid #3c3c3c;
+            border-radius: 4px;
+            background-color: #3c3c3c;
+            color: #d4d4d4;
+            flex-grow: 1; /* Allows inputs to fill space */
+            min-width: 60px;
+        }
+        .controls button {
+            padding: 8px 15px;
+            background-color: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 5px;
+        }
+        .instructions {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            padding-top: 5px;
+        }
+        .map-container {
+            flex-grow: 1;
+            position: relative;
+            touch-action: none; /* Crucial for preventing browser gestures on canvas */
+        }
+        #mapCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: grab;
+        }
+        #infoPopup {
+            position: absolute;
+            display: none;
+            background-color: rgba(40, 40, 40, 0.9);
+            border: 1px solid #666;
+            border-radius: 5px;
+            padding: 10px;
+            color: white;
+            pointer-events: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            font-size: 14px;
+        }
+        .coords-display {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: "Courier New", monospace;
+            color: #fff;
+            pointer-events: none;
+        }
+
+        /* Responsive styles for smaller screens */
+        @media (max-width: 480px) {
+            .controls { flex-direction: column; align-items: stretch; }
+            .controls-group { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <div class="header">
+            <div class="controls">
+                <div class="controls-group">
+                    <label for="seed">Seed:</label>
+                    <input type="text" id="seed" value="0">
+                </div>
+                <div class="controls-group">
+                    <label for="coordX">X:</label>
+                    <input type="number" id="coordX" value="0" step="16">
+                    <label for="coordZ">Z:</label>
+                    <input type="number" id="coordZ" value="0" step="16">
+                </div>
+                 <button id="updateButton">Update Map</button>
+            </div>
+            <div class="instructions">
+                Drag to pan | Pinch to zoom | Tap icons for info
+            </div>
+        </div>
+    
+        <div class="map-container" id="mapContainer">
+            <canvas id="mapCanvas"></canvas>
+            <div id="infoPopup"></div>
+            <div class="coords-display" id="mouseCoords">X: 0, Z: 0</div>
+        </div>
+    </div>
+
+    <script>
+        // --- EMBEDDED SIMPLEX NOISE LIBRARY (unchanged) ---
+        (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.SimplexNoise=f()}})(function(){var define,module,exports;return (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+        'use strict';var alea=require('alea');var G2=(3.0-Math.sqrt(3.0))/6.0;var F2=0.5*(Math.sqrt(3.0)-1.0);function SimplexNoise(random){if(typeof random=='function'){this.random=random}else if(random){this.random=alea(random)}else{this.random=Math.random}this.p=new Uint8Array(256);this.perm=new Uint8Array(512);this.permMod12=new Uint8Array(512);for(var i=0;i<256;i++){this.p[i]=this.random()*256}for(i=0;i<512;i++){this.perm[i]=this.p[i&255];this.permMod12[i]=this.perm[i]%12}}SimplexNoise.prototype={grad3:new Float32Array([1,1,0,-1,1,0,1,-1,0,-1,-1,0,1,0,1,-1,0,1,1,0,-1,-1,0,-1,0,1,1,0,-1,1,0,1,-1,0,-1,-1]),noise2D:function(xin,yin){var permMod12=this.permMod12;var perm=this.perm;var grad3=this.grad3;var n0,n1,n2;var s=(xin+yin)*F2;var i=Math.floor(xin+s);var j=Math.floor(yin+s);var t=(i+j)*G2;var X0=i-t;var Y0=j-t;var x0=xin-X0;var y0=yin-Y0;var i1,j1;if(x0>y0){i1=1;j1=0}else{i1=0;j1=1}var x1=x0-i1+G2;var y1=y0-j1+G2;var x2=x0-1.0+2.0*G2;var y2=y0-1.0+2.0*G2;var ii=i&255;var jj=j&255;var gi0=permMod12[ii+perm[jj]];var gi1=permMod12[ii+i1+perm[jj+j1]];var gi2=permMod12[ii+1+perm[jj+1]];var t0=0.5-x0*x0-y0*y0;if(t0<0){n0=0.0}else{t0*=t0;n0=t0*t0*(grad3[gi0*3]*x0+grad3[gi0*3+1]*y0)}var t1=0.5-x1*x1-y1*y1;if(t1<0){n1=0.0}else{t1*=t1;n1=t1*t1*(grad3[gi1*3]*x1+grad3[gi1*3+1]*y1)}var t2=0.5-x2*x2-y2*y2;if(t2<0){n2=0.0}else{t2*=t2;n2=t2*t2*(grad3[gi2*3]*x2+grad3[gi2*3+1]*y2)}return 70.0*(n0+n1+n2)}};module.exports=SimplexNoise;},{"alea":2}],2:[function(require,module,exports){
+        (function (global){
+        !function(){function n(n){var t=n,r=e();function e(){var n=new Array(4),t=0;for(var e=0;e<n.length;e++)n[e]=0;function o(n){for(var e=0;e<n.length;e++)n[e]=(n[e]<<24|n[e]>>>8)&4294967295}var u=function(){var n=0,e=2461440517;function u(n,t,r,o){this.b=n,this.c=t,this.d=r,this.a=o}u.prototype={next:function(){return this.b=this.b&2097151,this.d=this.d&1048575,this.c=this.c&1048575,4294967296*(this.b|this.d<<21)+((this.c|this.a<<20)&1048575>>>0)}};return function(r){var o=0,i=0,f=0,c=1;if(r=""+r,t>0)for(o=0;o<r.length;o++)n[o&3]^=r.charCodeAt(o),e++,t--;return new u(n[0]^i<<10,n[1]^f<<24,n[2]^c<<15,n[3]^o<<20)}}return r.mash=u,r.version=2,r}for(var t=0;t<arguments.length;t++)r+=arguments[t],e=2166136261;for(t=0;t<r.length;t++)e^=r.charCodeAt(t),e+=e<<1+e<<4+e<<7+e<<8+e<<24;return e}function t(){return 36969*(65535&r)+r>>>16}function r(){return 18e3*(65535&o)+o>>>16}function o(){return u=30903*u+a>>>16,u}var u=1024,a=1;global.alea=n;module.exports=n}();
+        }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+        },{}]},{},[1])(1)});
+
+        // --- GLOBAL VARIABLES & CONSTANTS ---
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        const mapContainer = document.getElementById('mapContainer');
+        const seedInput = document.getElementById('seed');
+        const xInput = document.getElementById('coordX');
+        const zInput = document.getElementById('coordZ');
+        const updateButton = document.getElementById('updateButton');
+        const mouseCoordsDisplay = document.getElementById('mouseCoords');
+        const infoPopup = document.getElementById('infoPopup');
+        
+        let worldSeed = 0;
+        let centerX = 0, centerZ = 0;
+        let zoomLevel = 0.25;
+        let isDragging = false;
+        let lastPanX, lastPanY;
+        let initialPinchDistance = null;
+        let visibleStructures = [];
+        let tempNoise, humidityNoise, elevationNoise;
+
+        const villageIcon = new Image();
+        villageIcon.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAlFJREFUOE+dk11IW1cUx/8vj5O0S5NNW2sJpwyiSFYiiAOhLrwQhRAUXYggKBpBl9JF0UUUFRZcRBAXurRFlwZFEOiCiIuIy5ZpM5vm5OTkLDW5OSft5OS8/3/gvb/POb/znfM757wD/J9JEAQ153LpZmVl8S0tLb2am5v/g4iL2cDAQG9hYWGNx+OXEolEdyASiSwsLPRDPp+fVVRUvGpra/sR0TkxMTEbHx//x+Fw7E1NTV+Wl5dfRkR+4XBYcnV1/VlYWFgKh8P5hYWFj2NjY3+Pj4+3QRD0i2i8uLi4tbe377+/v5/h8/nC+Pj4X41G4yEiYjAYfDUzM/Pb0tLSJ4vFAp1G41NE5Gq1+q2trf28tLT0YSKym5ubI1sAW1xcjIuPj/+PjY09DgaDAZ/PZ9jsdpvM5/Prx8fH+x0Oh+d+v/8xEQmCILjdbr/V1dV5+Pj4oMnlcsnlctlsNtuCIMjq6upYjUbzByLSbrd/am9v32EymUJGRkZ7eXl5kJeXJ9DpdPrfREREpNNp83q932KxWMPhsMvlckVFRSVcXV1nWCyWn8/nPwB4bm7uG4/H6zSZTFEURXFxcWFpaemftbW1L7lcLvP5fGFwcPBJRCiKIvj4+PhnZ2ff19bWJnt7e38hIvR6vT4ajV4eHx9/0ul0uVwuj8fjK4qi+vr6BvF4/A8ARVF+amrqfDgcPpvNZm1sbGxxcXHXzs7OXSLa0dHRtbe39wGAdrs9mp+f/z01NXWTyWQRCAQ+B4NBb29v3wJ4nU4X9vf332tra9+sr6+3uN1uPwJ4bm7ux8XFhaenp+cXFxf/ExFZLBafZWVlP7GxtLSU6Onp+X9paemj0+kcDQYDP5vN/gfgP+cXxGNd/iR7AAAAAElFTkSuQmCC';
+        
+        const BIOMES = { DEEP_OCEAN: { name: 'Deep Ocean', color: '#102070' }, OCEAN: { name: 'Ocean', color: '#1A2D8A' }, BEACH: { name: 'Beach', color: '#D2B98B' }, PLAINS: { name: 'Plains', color: '#8DB360' }, FOREST: { name: 'Forest', color: '#579543' }, JUNGLE: { name: 'Jungle', color: '#4F952B' }, DESERT: { name: 'Desert', color: '#D9C88E' }, SAVANNA: { name: 'Savanna', color: '#BDB25F' }, TAIGA: { name: 'Taiga', color: '#5C8271' }, SNOWY_PLAINS: { name: 'Snowy Plains', color: '#D0D0D0' }, ICE_SPIKES: { name: 'Ice Spikes', color: '#A0D0D0' }, MOUNTAINS: { name: 'Mountains', color: '#707070' }, HIGH_MOUNTAINS: { name: 'High Mountains', color: '#A0A0A0' } };
+
+        // --- CORE ALGORITHMS (Minified for space, but functionally identical) ---
+        function stringTo32BitSignedInteger(str) { let h=0;for(let i=0;i<str.length;i++){h=(h<<5)-h+str.charCodeAt(i);h|=0;}return h; }
+        class BedrockRandom { constructor(s){this.s=BigInt(s)}next(b){this.s=(this.s*0x5DEECE66Dn+0xBn)&((1n<<48n)-1n);return Number(this.s>>(48n-BigInt(b)))}nextInt(b){if(b<=0)throw new Error("b must be positive");let r=this.next(31),m=b-1;if((b&m)===0){r=Number((BigInt(b)*BigInt(r))>>31n)}else{let u=r;while(u-(r=u%b)+m<0){u=this.next(31)}}return r;}}
+        function isSlimeChunk(s, cX, cZ) { const r=new BedrockRandom((BigInt(cX)*BigInt(cX)*0x4c1906n)+(BigInt(cX)*0x5ac0dbn)+(BigInt(cZ)*BigInt(cZ)*0x4307a7n)+(BigInt(cZ)*0x5f24fn)^BigInt(s)); return r.nextInt(10)===0; }
+        function findPotentialVillage(s, rX, rZ) { const ss=BigInt(s)+BigInt(rX*2038128)+BigInt(rZ*347539)+0x4f3652n; const r=new BedrockRandom(ss); const xO=r.nextInt(24); const zO=r.nextInt(24); const bX=(rX*32+xO)*16+8; const bZ=(rZ*32+zO)*16+8; return {type:'Village',x:bX,z:bZ}; }
+        function getBiome(x, z) { const e=(elevationNoise.noise2D(x/800,z/800)+1)/2; const t=(tempNoise.noise2D(x/1000,z/1000)+1)/2; const h=(humidityNoise.noise2D(x/600,z/600)+1)/2; if(e<0.3)return BIOMES.DEEP_OCEAN; if(e<0.4)return BIOMES.OCEAN; if(e<0.42)return BIOMES.BEACH; if(e>0.85)return BIOMES.HIGH_MOUNTAINS; if(e>0.7)return BIOMES.MOUNTAINS; if(t<0.2){if(h>0.7)return BIOMES.ICE_SPIKES;return BIOMES.SNOWY_PLAINS;} if(t<0.5)return BIOMES.TAIGA; if(t>0.8){if(h<0.3)return BIOMES.DESERT;if(h>0.7)return BIOMES.JUNGLE;return BIOMES.SAVANNA;} if(h>0.6)return BIOMES.FOREST; return BIOMES.PLAINS; }
+
+        // --- COORDINATE TRANSFORMATION ---
+        function worldToScreen(x, z) { return { x: (x - centerX) * zoomLevel + canvas.width / 2, y: (z - centerZ) * zoomLevel + canvas.height / 2 }; }
+        function screenToWorld(sX, sY) { return { x: (sX - canvas.width / 2) / zoomLevel + centerX, z: (sY - canvas.height / 2) / zoomLevel + centerZ }; }
+
+        // --- DRAWING ENGINE ---
+        function drawMap() {
+            if (!tempNoise) return;
+            const view = { left: screenToWorld(0,0).x, right: screenToWorld(canvas.width,0).x, top: screenToWorld(0,0).z, bottom: screenToWorld(0,canvas.height).z };
+            const sampleSize = zoomLevel > 2 ? 4 : (zoomLevel > 0.5 ? 8 : 16);
+            for (let y = 0; y < canvas.height; y += sampleSize) {
+                for (let x = 0; x < canvas.width; x += sampleSize) {
+                    const worldPos = screenToWorld(x + sampleSize / 2, y + sampleSize / 2);
+                    ctx.fillStyle = getBiome(worldPos.x, worldPos.z).color;
+                    ctx.fillRect(x, y, sampleSize, sampleSize);
+                }
+            }
+            const chunkView = { left: Math.floor(view.left/16), right: Math.ceil(view.right/16), top: Math.floor(view.top/16), bottom: Math.ceil(view.bottom/16) };
+            ctx.fillStyle = 'rgba(120, 255, 120, 0.4)';
+            for (let cz = chunkView.top; cz <= chunkView.bottom; cz++) {
+                for (let cx = chunkView.left; cx <= chunkView.right; cx++) {
+                    if (isSlimeChunk(worldSeed, cx, cz)) {
+                        const chunkPos = worldToScreen(cx * 16, cz * 16);
+                        ctx.fillRect(chunkPos.x, chunkPos.y, 16 * zoomLevel, 16 * zoomLevel);
+                    }
+                }
+            }
+            visibleStructures = [];
+            const regionView = { left: Math.floor(chunkView.left/32), right: Math.ceil(chunkView.right/32), top: Math.floor(chunkView.top/32), bottom: Math.ceil(chunkView.bottom/32) };
+            for (let rz = regionView.top; rz <= regionView.bottom; rz++) {
+                for (let rx = regionView.left; rx <= regionView.right; rx++) {
+                    const v = findPotentialVillage(worldSeed, rx, rz);
+                    const sPos = worldToScreen(v.x, v.z);
+                    if (sPos.x > -20 && sPos.x < canvas.width + 20 && sPos.y > -20 && sPos.y < canvas.height + 20) {
+                        ctx.drawImage(villageIcon, sPos.x - 8, sPos.y - 8);
+                        visibleStructures.push({ ...v, screenX: sPos.x, screenY: sPos.y });
+                    }
+                }
+            }
+        }
+
+        // --- INPUT HANDLERS (DESKTOP & MOBILE) ---
+        function getEventCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) { // Touch event
+                return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+            }
+            // Mouse event
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function handlePanStart(e) {
+            isDragging = true;
+            const coords = getEventCoords(e);
+            lastPanX = coords.x;
+            lastPanY = coords.y;
+            canvas.style.cursor = 'grabbing';
+        }
+
+        function handlePanMove(e) {
+            if (!isDragging) return;
+            const coords = getEventCoords(e);
+            const dx = coords.x - lastPanX;
+            const dy = coords.y - lastPanY;
+            lastPanX = coords.x;
+            lastPanY = coords.y;
+            centerX -= dx / zoomLevel;
+            centerZ -= dy / zoomLevel;
+            drawMap();
+        }
+
+        function handlePanEnd() {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        }
+        
+        function handlePinch(e) {
+            e.preventDefault();
+            const t0 = e.touches[0];
+            const t1 = e.touches[1];
+            const currentDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+            
+            if (initialPinchDistance == null) {
+                initialPinchDistance = currentDist;
+            } else {
+                const rect = canvas.getBoundingClientRect();
+                const pinchCenterX = (t0.clientX + t1.clientX) / 2 - rect.left;
+                const pinchCenterY = (t0.clientY + t1.clientY) / 2 - rect.top;
+                
+                const worldPosBefore = screenToWorld(pinchCenterX, pinchCenterY);
+                const zoomFactor = currentDist / initialPinchDistance;
+                zoomLevel *= zoomFactor;
+                zoomLevel = Math.max(0.01, Math.min(zoomLevel, 64));
+                const worldPosAfter = screenToWorld(pinchCenterX, pinchCenterY);
+
+                centerX += worldPosBefore.x - worldPosAfter.x;
+                centerZ += worldPosBefore.z - worldPosAfter.z;
+                
+                drawMap();
+            }
+            initialPinchDistance = currentDist;
+        }
+        
+        function handleTap(e) {
+            const rect = canvas.getBoundingClientRect();
+            const tapX = (e.changedTouches ? e.changedTouches[0].clientX : e.clientX) - rect.left;
+            const tapY = (e.changedTouches ? e.changedTouches[0].clientY : e.clientY) - rect.top;
+            
+            let clicked = null;
+            const clickRadiusSq = 16 * 16; // Larger radius for touch
+            for (const s of visibleStructures) {
+                const dx = tapX - s.screenX; const dy = tapY - s.screenY;
+                if (dx * dx + dy * dy < clickRadiusSq) { clicked = s; break; }
+            }
+            if (clicked) {
+                infoPopup.innerHTML = `<strong>${clicked.type}</strong><br>X: ${clicked.x}, Z: ${clicked.z}`;
+                infoPopup.style.left = `${tapX + 15}px`; infoPopup.style.top = `${tapY + 15}px`;
+                infoPopup.style.display = 'block';
+            } else {
+                infoPopup.style.display = 'none';
+            }
+        }
+
+        // --- GENERAL LOGIC ---
+        function updateFromControls() {
+            let seedValue = seedInput.value.trim() || '0';
+            worldSeed = isNaN(parseInt(seedValue, 10)) ? stringTo32BitSignedInteger(seedValue) : parseInt(seedValue, 10) | 0;
+            tempNoise = new SimplexNoise(worldSeed);
+            humidityNoise = new SimplexNoise(worldSeed + 1);
+            elevationNoise = new SimplexNoise(worldSeed + 2);
+            centerX = parseInt(xInput.value, 10) || 0;
+            centerZ = parseInt(zInput.value, 10) || 0;
+            infoPopup.style.display = 'none';
+            drawMap();
+        }
+
+        // --- INITIALIZATION ---
+        function init() {
+            // Resize canvas to fit container
+            function handleResize() {
+                canvas.width = mapContainer.clientWidth;
+                canvas.height = mapContainer.clientHeight;
+                drawMap();
+            }
+            window.addEventListener('resize', handleResize);
+            handleResize(); // Initial size
+
+            // Mouse Events (for Desktop)
+            canvas.addEventListener('mousedown', handlePanStart);
+            canvas.addEventListener('mousemove', (e) => {
+                handlePanMove(e);
+                const coords = screenToWorld(e.offsetX, e.offsetY);
+                mouseCoordsDisplay.textContent = `X: ${Math.floor(coords.x)}, Z: ${Math.floor(coords.z)}`;
+            });
+            canvas.addEventListener('mouseup', handlePanEnd);
+            canvas.addEventListener('mouseleave', handlePanEnd);
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const worldPosBefore = screenToWorld(e.offsetX, e.offsetY);
+                zoomLevel *= e.deltaY < 0 ? 1.2 : 1/1.2;
+                zoomLevel = Math.max(0.01, Math.min(zoomLevel, 64));
+                const worldPosAfter = screenToWorld(e.offsetX, e.offsetY);
+                centerX += worldPosBefore.x - worldPosAfter.x;
+                centerZ += worldPosBefore.z - worldPosAfter.z;
+                drawMap();
+            });
+            canvas.addEventListener('click', handleTap);
+
+            // Touch Events (for Mobile)
+            let tapTimeout;
+            let lastTap = 0;
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (e.touches.length === 1) {
+                    handlePanStart(e);
+                    // Simple tap detection
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    clearTimeout(tapTimeout);
+                    if (tapLength < 250 && tapLength > 0) {
+                        handleTap(e);
+                    }
+                    lastTap = currentTime;
+                } else if (e.touches.length === 2) {
+                    isDragging = false; // Stop panning when pinch starts
+                    handlePinch(e);
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (e.touches.length === 1) {
+                    handlePanMove(e);
+                } else if (e.touches.length === 2) {
+                    handlePinch(e);
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handlePanEnd();
+                initialPinchDistance = null;
+            });
+            
+            // UI Controls
+            updateButton.addEventListener('click', updateFromControls);
+            seedInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') updateFromControls(); });
+
+            villageIcon.onload = updateFromControls;
+            if(villageIcon.complete) updateFromControls();
+        }
+        
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
