@@ -1,7 +1,5 @@
-/* style-sub1.css — Skinfinder-specific styles (keeps homepage look) */
-
 body {
-  background-image: url(/MCBETools/images/Minecraft.jpg);
+  background-image: url(images/Minecraft.jpg);
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-size: cover;
@@ -80,6 +78,3 @@ input#gamertag {
   color: #222;
   margin-top: 8px;
 }
-
-/* keep buttons consistent with homepage button style in style.css;
-   style.css already targets button elements with the big chunky design */
