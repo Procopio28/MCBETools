@@ -1,25 +1,19 @@
-# MCBE Tools – Skin Finder
+# MCBE Tools
 
-This project provides a Minecraft Bedrock Edition skin finder using the [GeyserMC API](https://geysermc.org/).  
-It fetches player skin data from `minecraft.net` and allows exporting the skin as a **.mcpack** (Bedrock-compatible skin pack).
+## Skin Finder
 
-## Features
-- Look up Minecraft Bedrock player skins using the GeyserMC API.
-- Fetch the actual skin texture from `minecraft.net`.
-- Download the skin as a `.mcpack` file (works in Minecraft Bedrock).
+A small tool to look up Minecraft Bedrock player skins using the GeyserMC API and download them as PNG or as a Bedrock-compatible `.mcpack` skin pack.
 
-## How It Works
-1. Enter a valid Minecraft username/UUID.  
-2. The site queries the GeyserMC API to fetch skin data.  
-3. The skin texture is retrieved from Minecraft.net.  
-4. A `.mcpack` is generated in the browser (via [JSZip](https://stuk.github.io/jszip/)) and downloaded.
+### Features
+- Lookup player skins (uses GeyserMC + `textures.minecraft.net`)
+- Download skin PNG
+- Generate a `.mcpack` (skin pack) in the browser that can be imported into Minecraft Bedrock
 
-## Live Demo
-👉 [MCBE Tools – Skin Finder](https://procopio28.github.io/MCBETools/)
+### Live demo
+https://procopio28.github.io/MCBETools/
 
-## Status
-- ✅ Skin fetching works.  
-- 🚧 `.mcpack` export in progress.  
+### How it works
+The site fetches player skin info from the GeyserMC API, pulls the texture from `textures.minecraft.net`, then builds a small skin pack client-side (manifest, skins.json, language file, and the skin PNG) and zips it as a `.mcpack` for download.
 
-## License
-This project is open source under the MIT License.
+### License
+MIT
