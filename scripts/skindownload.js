@@ -1,182 +1,231 @@
 (function(){
-  function loadScript(url){
-    return new Promise(function(res,rej){
-      if(document.querySelector('script[src="'+url+'"]')) return res();
-      var s=document.createElement('script');
-      s.src=url;
-      s.onload=res;
-      s.onerror=rej;
+  var JSZIP_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+  function loadJSZip(){
+    return new Promise(function(resolve,reject){
+      if(window.JSZip) return resolve(window.JSZip);
+      var s = document.createElement('script');
+      s.src = JSZIP_CDN;
+      s.onload = function(){ return window.JSZip ? resolve(window.JSZip) : reject(new Error('no JSZip')); };
+      s.onerror = function(){ reject(new Error('failed to load JSZip')); };
       document.head.appendChild(s);
     });
   }
   function uuidv4(){
+    if(window.crypto && crypto.randomUUID) try{ return crypto.randomUUID(); }catch(e){}
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
-      var r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);
+      var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
       return v.toString(16);
     });
   }
-  function findModelContainer(){
-    var candidates=['#Transparent','.center','#model','#viewer','.viewer','.model','model-viewer','canvas','#player3d','.player3d','main'];
-    for(var i=0;i<candidates.length;i++){
-      var sel=candidates[i];
-      var el=document.querySelector(sel);
-      if(el) return el;
-    }
-    var canv=document.querySelector('canvas');
-    if(canv) return canv.parentElement||document.body;
-    return document.body;
+  function extractNameFromUrl(url){
+    try{
+      var p = url.split('/');
+      var file = p[p.length-1] || '';
+      return file.split('.')[0] || 'skin';
+    }catch(e){ return 'skin'; }
   }
-  function findSkinElement(){
-    var imgs=Array.from(document.querySelectorAll('img'));
+  var state = {img:null, username:'skin', wrapperId:'mcpack-download-wrapper'};
+  function findSkinImage(){
+    var imgs = Array.from(document.querySelectorAll('img'));
     for(var i=0;i<imgs.length;i++){
-      var img=imgs[i];
-      var s=img.src||'';
-      if(s.indexOf('textures.minecraft.net')!==-1||s.indexOf('minecraft.net')!==-1||s.indexOf('data:image')===0||s.indexOf('blob:')===0) return {type:'img',el:img,src:s};
-    }
-    for(var i=0;i<imgs.length;i++){
-      var img=imgs[i];
-      if(img.dataset && (img.dataset.skin||img.dataset.src)) return {type:'img',el:img,src:img.dataset.skin||img.dataset.src};
-    }
-    var els=Array.from(document.querySelectorAll('*'));
-    for(var i=0;i<els.length;i++){
-      var bg=getComputedStyle(els[i]).backgroundImage||'';
-      var m=bg.match(/url\(["']?(.*?)["']?\)/);
-      if(m && (m[1].indexOf('textures.minecraft.net')!==-1||m[1].indexOf('minecraft.net')!==-1)) return {type:'bg',el:els[i],src:m[1]};
-    }
-    var canvases=Array.from(document.querySelectorAll('canvas'));
-    for(var i=0;i<canvases.length;i++){
-      try{
-        var d=canvases[i].toDataURL('image/png');
-        if(d && d.indexOf('data:image')===0) return {type:'canvas',el:canvases[i],src:d};
-      }catch(e){}
+      var im = imgs[i];
+      if(!im.src) continue;
+      if(im.src.indexOf('textures.minecraft.net') !== -1) return im;
+      var meta = (im.alt||'') + ' ' + (im.className||'') + ' ' + (im.id||'') + ' ' + im.src;
+      if(/skin|texture|avatar|minecraft/i.test(meta)) return im;
     }
     return null;
   }
-  function fetchBlob(src){
-    if(src.indexOf('data:image')===0) return fetch(src).then(function(r){return r.blob();});
-    return fetch(src, {mode:'cors'}).then(function(r){
-      if(!r.ok) throw new Error('fetch failed: '+r.status);
-      return r.blob();
-    });
-  }
-  function triggerDownload(blob, name){
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');
-    a.href=url;
-    a.download=name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function(){URL.revokeObjectURL(url);}, 10000);
-  }
-  function safeName(s){
-    if(!s) return 'skin';
-    return String(s).trim().replace(/\s+/g,'_').replace(/[^\w\-\.]/g,'').slice(0,64) || 'skin';
-  }
-  function getDisplayedName(){
-    var possible=['#username','input[name=username]','.username','#player','.playername','#nick'];
-    for(var i=0;i<possible.length;i++){
-      var el=document.querySelector(possible[i]);
-      if(el) return el.value||el.textContent||el.innerText;
+  function ensureWrapper(img){
+    var existing = document.getElementById(state.wrapperId);
+    if(existing){
+      existing.dataset.src = img.src || '';
+      return existing;
     }
-    var h=document.querySelector('h1,h2,h3');
-    if(h) return h.textContent.trim().split(/\s+/)[0];
-    return 'skin';
+    var wrap = document.createElement('div');
+    wrap.id = state.wrapperId;
+    wrap.style.display = 'inline-flex';
+    wrap.style.gap = '8px';
+    wrap.style.marginTop = '8px';
+    var btnPng = document.createElement('button');
+    btnPng.type = 'button';
+    btnPng.id = 'mcpack-btn-png';
+    btnPng.textContent = 'Download PNG';
+    var btnPack = document.createElement('button');
+    btnPack.type = 'button';
+    btnPack.id = 'mcpack-btn-mcpack';
+    btnPack.textContent = 'Download MCPACK';
+    wrap.appendChild(btnPng);
+    wrap.appendChild(btnPack);
+    wrap.dataset.src = img.src || '';
+    img.parentNode && img.parentNode.insertBefore(wrap, img.nextSibling);
+    btnPng.addEventListener('click', function(e){ return downloadPNG(img); });
+    btnPack.addEventListener('click', function(e){ return downloadMCPackFor(img); });
+    return wrap;
   }
-  function buildFilesForPack(blob, baseName){
-    var packId = safeName(baseName);
-    var manifest = {
-      header: {
-        name: "pack.name",
-        version: [1,0,0],
-        uuid: uuidv4()
-      },
-      modules: [
-        {
-          version: [1,0,0],
-          type: "skin_pack",
-          uuid: uuidv4()
-        }
-      ],
-      format_version: 1
-    };
-    var skins = {
-      serialize_name: packId,
-      localization_name: packId,
-      skins: [
-        {
-          localization_name: "skin_"+packId,
-          geometry: "geometry.humanoid.custom",
-          texture: baseName + ".png",
-          type: "free"
-        }
-      ]
-    };
-    var en = "skinpack."+packId+"="+baseName+"\nskin."+packId+".skin_"+packId+"="+baseName+"\n";
-    var languages = JSON.stringify({languages:["en_US"]});
-    return {manifest:manifest,skins:skins,enUS:en,languages:languages};
+  async function downloadPNG(img){
+    if(!img || !img.src){ alert('No skin to download'); return; }
+    try{
+      var r = await fetch(img.src);
+      if(!r.ok){ alert('Failed to fetch PNG'); return; }
+      var b = await r.blob();
+      var name = img.dataset && img.dataset.username ? img.dataset.username : extractNameFromUrl(img.src);
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = name + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+    }catch(e){
+      alert('Error downloading PNG');
+    }
   }
-  function addButtonsAndWire(container){
-    if(document.getElementById('mcpack-download-btns')) return;
-    var wrap=document.createElement('div');
-    wrap.id='mcpack-download-btns';
-    wrap.style.marginTop='8px';
-    var b1=document.createElement('button');
-    b1.id='download-png';
-    b1.textContent='Download PNG';
-    var b2=document.createElement('button');
-    b2.id='download-mcpack';
-    b2.textContent='Download MCPACK';
-    wrap.appendChild(b1);
-    wrap.appendChild(b2);
-    container.appendChild(wrap);
-    b1.addEventListener('click', function(){
-      var elem=findSkinElement();
-      if(!elem){alert('Skin not found on page');return;}
-      fetchBlob(elem.src).then(function(blob){
-        var name = safeName(getDisplayedName()) + '.png';
-        triggerDownload(blob, name);
-      }).catch(function(err){
-        alert('Failed to download PNG: '+err.message);
-      });
-    });
-    b2.addEventListener('click', function(){
-      var elem=findSkinElement();
-      if(!elem){alert('Skin not found on page');return;}
-      fetchBlob(elem.src).then(function(blob){
-        var base=safeName(getDisplayedName());
-        loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js').then(function(){
-          var zip=new JSZip();
-          var files=buildFilesForPack(blob, base);
-          zip.file('manifest.json', JSON.stringify(files.manifest, null, 2));
-          zip.file('skins.json', JSON.stringify(files.skins, null, 2));
-          zip.file(base + '.png', blob);
-          zip.folder('texts').file('en_US.lang', files.enUS);
-          zip.folder('texts').file('languages.json', files.languages);
-          return zip.generateAsync({type:'blob'});
-        }).then(function(zblob){
-          triggerDownload(zblob, base + '.mcpack');
-        }).catch(function(err){
-          alert('Failed to build mcpack: '+err.message);
-        });
-      }).catch(function(err){
-        alert('Failed to fetch skin: '+err.message);
-      });
-    });
-  }
-  function moveShowDetailsBelow(container){
-    var els=Array.from(document.querySelectorAll('button,a,input[type=button]'));
-    for(var i=0;i<els.length;i++){
-      var t=els[i].textContent||els[i].value||'';
-      if(/show\s*detail/i.test(t)){
-        container.appendChild(els[i]);
-        return;
+  async function detectGeometryFromBlob(blob){
+    try{
+      var bitmap = await createImageBitmap(blob);
+      var w = bitmap.width, h = bitmap.height;
+      if(h === 32) return 'geometry.humanoid.custom';
+      if(w === 64 && h === 64){
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        var ctx = c.getContext('2d');
+        ctx.drawImage(bitmap,0,0);
+        try{
+          var d = ctx.getImageData(54,20,1,1).data;
+          if(d[3] === 0) return 'geometry.humanoid.customSlim';
+        }catch(e){}
+        return 'geometry.humanoid.custom';
       }
+      return 'geometry.humanoid.custom';
+    }catch(e){
+      return 'geometry.humanoid.custom';
     }
+  }
+  async function downloadMCPackFor(img){
+    if(!img || !img.src){ alert('No skin to pack'); return; }
+    var zipLib;
+    try{ zipLib = await loadJSZip(); }catch(e){ alert('Failed to load zip library'); return; }
+    try{
+      var r = await fetch(img.src);
+      if(!r.ok){ alert('Failed to fetch skin'); return; }
+      var blob = await r.blob();
+      var geometry = await detectGeometryFromBlob(blob);
+      var uname = img.dataset && img.dataset.username ? img.dataset.username : extractNameFromUrl(img.src);
+      var safeName = (uname || 'skin').replace(/[^\w\-_.]/g,'_');
+      var skinFilename = safeName + '.png';
+      var packName = 'MCBE Skin - ' + (uname || 'Skin');
+      var headerUUID = uuidv4();
+      var moduleUUID = uuidv4();
+      var manifest = {
+        format_version: 1,
+        header: {
+          name: packName,
+          description: 'Generated by MCBE Tools Skin Finder',
+          uuid: headerUUID,
+          version: [1,0,0],
+          min_engine_version: [1,16,0]
+        },
+        modules: [
+          { type: 'skin_pack', uuid: moduleUUID, version: [1,0,0] }
+        ]
+      };
+      var serialize = 'mcbe_skin_' + safeName;
+      var skinsJson = {
+        serialize_name: serialize,
+        localization_name: serialize,
+        skins: [
+          {
+            localization_name: uname || 'skin',
+            geometry: geometry,
+            texture: skinFilename,
+            type: 'free'
+          }
+        ]
+      };
+      var lang = 'skinpack.' + serialize + '=' + packName + '\n' + 'skin.' + serialize + '.' + (uname || safeName) + '=' + (uname || safeName);
+      var zip = new window.JSZip();
+      zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+      zip.file('skins.json', JSON.stringify(skinsJson, null, 2));
+      zip.folder('texts').file('en_US.lang', lang);
+      zip.file(skinFilename, blob);
+      var out = await zip.generateAsync({type:'blob'});
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(out);
+      a.download = packName + '.mcpack';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+    }catch(e){
+      alert('Error generating MCPACK');
+    }
+  }
+  function onNewSkinImage(img){
+    if(!img) return;
+    state.img = img;
+    var uname = img.dataset && img.dataset.username ? img.dataset.username : extractNameFromUrl(img.src);
+    state.username = uname;
+    ensureWrapper(img);
+  }
+  function observeDOM(){
+    var mo = new MutationObserver(function(muts){
+      for(var i=0;i<muts.length;i++){
+        var m = muts[i];
+        if(m.type === 'childList' && m.addedNodes && m.addedNodes.length){
+          for(var j=0;j<m.addedNodes.length;j++){
+            var node = m.addedNodes[j];
+            if(node.nodeType !== 1) continue;
+            if(node.tagName === 'IMG' && node.src && (node.src.indexOf('textures.minecraft.net') !== -1 || /skin|texture|avatar|minecraft/i.test(node.alt + ' ' + node.className + ' ' + node.id + ' ' + node.src))){
+              node.addEventListener('load', function(){ onNewSkinImage(node); });
+              onNewSkinImage(node);
+              return;
+            }
+            try{
+              var imgs = node.querySelectorAll && node.querySelectorAll('img');
+              for(var k=0;k<(imgs?imgs.length:0);k++){
+                var im = imgs[k];
+                if(im.src && (im.src.indexOf('textures.minecraft.net') !== -1 || /skin|texture|avatar|minecraft/i.test(im.alt + ' ' + im.className + ' ' + im.id + ' ' + im.src))){
+                  im.addEventListener('load', function(){ onNewSkinImage(im); });
+                  onNewSkinImage(im);
+                  return;
+                }
+              }
+            }catch(e){}
+          }
+        }
+        if(m.type === 'attributes' && m.target && m.target.tagName === 'IMG' && (m.attributeName === 'src' || m.attributeName === 'data-src')){
+          var t = m.target;
+          if(t.src && (t.src.indexOf('textures.minecraft.net') !== -1 || /skin|texture|avatar|minecraft/i.test(t.alt + ' ' + t.className + ' ' + t.id + ' ' + t.src))){
+            onNewSkinImage(t);
+            return;
+          }
+        }
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src','data-src'] });
+    var periodic = setInterval(function(){
+      if(!state.img){
+        var found = findSkinImage();
+        if(found) onNewSkinImage(found);
+      }
+    }, 800);
+  }
+  function moveShowDetails(){
+    var all = Array.from(document.querySelectorAll('button,a,span'));
+    var btn = all.find(function(el){
+      return el.textContent && /show/i.test(el.textContent) && /detail/i.test(el.textContent);
+    });
+    if(!btn) return;
+    var model = document.querySelector('canvas') || document.querySelector('.viewer') || document.querySelector('.model') || document.querySelector('.skin-viewer') || document.querySelector('#skin3d') || document.querySelector('.skin3d');
+    if(!model) return;
+    if(model.parentNode) model.parentNode.insertBefore(btn, model.nextSibling);
   }
   document.addEventListener('DOMContentLoaded', function(){
-    var container=findModelContainer();
-    addButtonsAndWire(container);
-    moveShowDetailsBelow(container);
+    var f = findSkinImage();
+    if(f) onNewSkinImage(f);
+    observeDOM();
+    moveShowDetails();
+    setTimeout(moveShowDetails, 800);
   });
 })();
